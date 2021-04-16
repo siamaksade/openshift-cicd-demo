@@ -82,8 +82,8 @@ command.install() {
   info "Configure service account permissions for pipeline"
   oc policy add-role-to-user edit system:serviceaccount:$cicd_prj:pipeline -n $dev_prj
   oc policy add-role-to-user edit system:serviceaccount:$cicd_prj:pipeline -n $stage_prj
-  oc policy add-role-to-user system:image-puller system:serviceaccount:$dev_prj:default -n $stage_prj
-  oc policy add-role-to-user system:image-puller system:serviceaccount:$stage_prj:default -n $stage_prj
+  oc policy add-role-to-user system:image-puller system:serviceaccount:$dev_prj:default -n $cicd_prj
+  oc policy add-role-to-user system:image-puller system:serviceaccount:$stage_prj:default -n $cicd_prj
 
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
