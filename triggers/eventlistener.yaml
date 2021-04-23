@@ -17,7 +17,7 @@ spec:
       bindings:
         - ref: gogs-triggerbinding
       template:
-        name: petclinic-trigger-template
+        ref: petclinic-trigger-template
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -29,7 +29,7 @@ metadata:
     eventlistener: webhook
 spec:
   port:
-    targetPort: 8080
+    targetPort: http-listener
   to:
     kind: "Service"
     name: el-webhook
