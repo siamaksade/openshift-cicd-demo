@@ -124,5 +124,11 @@ spec:
         - /usr/bin/mvn
       image: $(params.MAVEN_IMAGE)
       name: mvn-goals
-      resources: {}
       workingDir: $(workspaces.source.path)
+      resources:
+        requests:
+          memory: 512Mi
+          cpu: 200m
+        limits:
+          memory: 4Gi
+          cpu: 1
