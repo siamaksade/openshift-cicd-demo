@@ -11,7 +11,7 @@ spec:
     path: environments/stage
     repoURL: https://github.com/siamaksade/spring-petclinic-config
     targetRevision: HEAD
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  # syncPolicy:
+  #   automated:
+  #     prune: true
+  #     selfHeal: true
