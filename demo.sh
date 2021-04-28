@@ -154,7 +154,7 @@ EOF
   Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
-  Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [admin pwd: $(oc get secret argocd-cluster -n $cicd_prj -ojsonpath='{.data.admin\.password}' | base64 -d)]
+  Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [admin pwd: $(oc get secret argocd-cluster -n $cicd_prj -o jsonpath='{.data.admin\.password}' | base64 -d)]
 
 ############################################################################
 ############################################################################
