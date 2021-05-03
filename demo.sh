@@ -21,7 +21,7 @@ err() {
 
 while (( "$#" )); do
   case "$1" in
-    install|uninstall|start)
+    install|uninstall|start|promote)
       COMMAND=$1
       shift
       ;;
@@ -58,6 +58,7 @@ command.help() {
       install                        Sets up the demo and creates namespaces
       uninstall                      Deletes the demo
       start                          Starts the deploy DEV pipeline
+      promote                        Promotes the current DEV image to STAGE
       help                           Help about this command
 
   OPTIONS:
@@ -168,6 +169,53 @@ command.start() {
 command.uninstall() {
   oc delete project $dev_prj $stage_prj $cicd_prj
 }
+
+command.promote() {
+  echo "Promoting current DEV to STAGE..."
+  FULL_IMAGE=$(oc get deployment spring-petclinic -n $dev_prj -o=jsonpath='{.spec.template.spec.containers[0].image}')
+  IMAGE=$(echo $FULL_IMAGE| cut -d'@' -f 1)
+  DIGEST=$(echo $FULL_IMAGE| cut -d'@' -f 2)
+
+  echo "Promoting $IMAGE to $DIGEST in $stage_prj..."
+
+  GOGS_HOSTNAME=$(oc get route gogs -o template --template='{{.spec.host}}' -n $cicd_prj)
+  CONFIG_PRJ=http://$GOGS_HOSTNAME/gogs/spring-petclinic-config.git
+  LOCAL_DIR=/tmp/demo-config
+
+  echo "Tagging promoted digest"
+  # tagging release to "testing"
+  oc tag $cicd_prj/spring-petclinic@$DIGEST $cicd_prj/spring-petclinic:testing
+
+  # clone project
+  echo "Cloning config project: $CONFIG_PRJ..."
+  rm -rf $LOCAL_DIR
+  git clone $CONFIG_PRJ $LOCAL_DIR
+
+
+  # create new kustomize file
+  cat << EOF > $LOCAL_DIR/environments/stage/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../app/
+
+images:
+- name: quay.io/siamaksade/spring-petclinic:latest
+  newName: $IMAGE
+  digest: $DIGEST
+EOF
+
+  local currentDir=$(pwd)
+
+  cd $LOCAL_DIR
+  COMMIT_MSG="[ci] Staging $DIGEST"
+  git add environments/stage/kustomization.yaml
+  git commit -m "$COMMIT_MSG"
+  git push
+
+  cd $currentDir  
+}
+
 
 main() {
   local fn="command.$COMMAND"
