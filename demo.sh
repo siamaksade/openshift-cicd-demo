@@ -45,6 +45,7 @@ declare -r dev_prj="$PRJ_PREFIX-dev"
 declare -r stage_prj="$PRJ_PREFIX-stage"
 declare -r cicd_prj="$PRJ_PREFIX-cicd"
 
+
 command.help() {
   cat <<-EOF
 
@@ -63,6 +64,7 @@ command.help() {
 
   OPTIONS:
       -p|--project-prefix [string]   Prefix to be added to demo project names e.g. PREFIX-dev
+      
 EOF
 }
 
@@ -126,8 +128,8 @@ spec:
     repoURL: http://$GOGS_HOSTNAME/gogs/spring-petclinic-config
 EOF
   oc apply -k argo -n $cicd_prj
-  oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $dev_prj
-  oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $stage_prj
+  oc policy add-role-to-user admin system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller -n $dev_prj
+  oc policy add-role-to-user admin system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller -n $stage_prj
 
   oc project $cicd_prj
 
@@ -155,7 +157,7 @@ EOF
   Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
-  Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [admin pwd: $(oc get secret argocd-cluster -n $cicd_prj -ojsonpath='{.data.admin\.password}' | base64 -d)]
+  Argo CD:  http://$(oc get route openshift-gitops-server -o template --template='{{.spec.host}}' -n openshift-gitops)  [admin pwd: $(oc get secret openshift-gitops-cluster -n openshift-gitops -ojsonpath='{.data.admin\.password}' | base64 -d)]
 
 ############################################################################
 ############################################################################

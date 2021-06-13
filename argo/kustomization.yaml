@@ -1,5 +1,7 @@
 resources:
-- argocd.yaml
+# we are not going to create our own argocd cluster here. 
+# We are going to use openshift-gitops one
+#- argocd.yaml
 - argocd-petclinic-project.yaml
 - argocd-app-dev.yaml
 - argocd-app-stage.yaml
