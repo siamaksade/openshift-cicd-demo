@@ -61,6 +61,18 @@ Argo CD continuously monitor the configurations stored in the Git repository and
     $ tkn pipeline logs petclinic-deploy-dev -n NAMESPACE
     ```
 
+1. To promote your current DEV stuff to STAGE, run the following:
+   
+   ```
+   $ demo.sh promote 
+   ```
+
+   This will get the current DIGEST of the running IMAGE and will change the kustomize.yaml file 
+   accordingly.
+
+   It will then push the changes to `spring-petclinic-config` Git repository on Gogs.
+
+   
 ![Pipeline Diagram](docs/images/pipeline-viz.png)
 
 ![Argo CD](docs/images/argocd.png)
