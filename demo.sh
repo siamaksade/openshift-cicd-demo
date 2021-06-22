@@ -127,6 +127,21 @@ EOF
   oc apply -k argo -n $cicd_prj
   oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $dev_prj
   oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $stage_prj
+  sed "s/demo-cicd/$cicd_proj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $dev_prj
+  sed "s/demo-cicd/$cicd_proj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $stage_prj
+
+cat <<EOF | kubectl apply -n $cicd_prj -f -
+kind: Secret
+apiVersion: v1
+metadata:
+  name: argocd-default-cluster-config
+data:
+  config: $(echo -n '{"tlsClientConfig":{"insecure":false}}' | base64)
+  name: $(echo -n "in-cluster" | base64)
+  namespaces: $(echo -n "$cicd_prj,$dev_prj,$stage_prj" | base64)
+  server: $(echo -n "https://kubernetes.default.svc" | base64)
+type: Opaque
+EOF
 
   oc project $cicd_prj
 
