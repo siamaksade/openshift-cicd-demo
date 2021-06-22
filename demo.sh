@@ -127,8 +127,8 @@ EOF
   oc apply -k argo -n $cicd_prj
   oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $dev_prj
   oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $stage_prj
-  sed "s/demo-cicd/$cicd_proj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $dev_prj
-  sed "s/demo-cicd/$cicd_proj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $stage_prj
+  sed "s/demo-cicd/$cicd_prj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $dev_prj
+  sed "s/demo-cicd/$cicd_prj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $stage_prj
 
 cat <<EOF | kubectl apply -n $cicd_prj -f -
 kind: Secret
