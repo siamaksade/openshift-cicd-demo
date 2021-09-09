@@ -2,7 +2,7 @@
 
 This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for continuous integration and [Argo CD](https://argoproj.github.io/argo-cd/) for continuous delivery on OpenShift which builds and deploys the [Spring PetClinic](https://github.com/spring-projects/spring-petclinic) sample Spring Boot application. This demo creates:
 * 3 namespaces for CI/CD, DEV and STAGE projects
-* 1 Tekton pipeline for building the application image on every Git commit 
+* 1 Tekton pipeline for building the application image on every Git commit
 * Argo CD (username/password: `admin`/[_retrieve from the cluster_])
 * Gogs git server (username/password: `gogs`/`gogs`)
 * Sonatype Nexus (username/password: `admin`/`admin123`)
@@ -39,7 +39,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 # Deploy
 1. Get an OpenShift cluster via https://try.openshift.com
-1. Install OpenShift GitOps Operator 
+1. Install OpenShift GitOps Operator
 1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [Tekton CLI](https://github.com/tektoncd/cli/releases)
 1. Deploy the demo
 
