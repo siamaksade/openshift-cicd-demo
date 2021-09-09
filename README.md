@@ -1,6 +1,7 @@
 # CI/CD Demo with Tekton and Argo CD on OpenShift
 
 This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for continuous integration and [Argo CD](https://argoproj.github.io/argo-cd/) for continuous delivery on OpenShift which builds and deploys the [Spring PetClinic](https://github.com/spring-projects/spring-petclinic) sample Spring Boot application. This demo creates:
+
 * 3 namespaces for CI/CD, DEV and STAGE projects
 * 1 Tekton pipeline for building the application image on every Git commit
 * Argo CD (username/password: `admin`/[_retrieve from the cluster_])
@@ -14,6 +15,7 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 </p>
 
 ## Prerequisites
+
 * Get an OpenShift cluster
 * Install OpenShift Pipelines 1.4 operator
 * Install OpenShift GitOps 1.1 operator
@@ -36,14 +38,14 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 ![Continuous Delivery](docs/images/cd.png)
 
+## Deploy
 
-# Deploy
 1. Get an OpenShift cluster via https://try.openshift.com
 1. Install OpenShift GitOps Operator
 1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [Tekton CLI](https://github.com/tektoncd/cli/releases)
 1. Deploy the demo
 
-    ```
+    ```text
     $ oc new-project demo
     $ git clone https://github.com/siamaksade/openshift-cicd-demo
     $ demo.sh install
@@ -51,13 +53,13 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gogs, or run the following:
 
-    ```
+    ```text
     $ demo.sh start
     ```
 
 1. Check pipeline run logs
 
-    ```
+    ```text
     $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
     ```
 
@@ -65,8 +67,18 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 ![Argo CD](docs/images/argocd.png)
 
+## Trigger Pipeline
 
-# Troubleshooting
+1. Go to spring-petclinic Git repository in Gogs
+1. Log into Gogs with username/password: `gogs`/`gogs`
+1. Edit a file in the repository and commit to trigger the pipeline
+1. Check the pipeline run logs in Dev Console or Tekton CLI:
+
+   ```text
+   $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
+   ```
+
+## Troubleshooting
 
 **Q: Why am I getting `unable to recognize "tasks/task.yaml": no matches for kind "Task" in version "tekton.dev/v1beta1"` errors?**
 
