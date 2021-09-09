@@ -160,10 +160,10 @@ EOF
   3) Edit a file in the repository and commit to trigger the pipeline
 
   4) Check the pipeline run logs in Dev Console or Tekton CLI:
-     
-    \$ tkn pipeline logs petclinic-deploy-dev -f -n $cicd_prj
 
-  
+    \$ tkn pipeline logs petclinic-build -L -f -n $cicd_prj
+
+
   You can find further details at:
   
   Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos

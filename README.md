@@ -45,7 +45,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
     ```
     $ oc new-project demo
-    $ git clone https://github.com/siamaksade/tekton-cd-demo
+    $ git clone https://github.com/siamaksade/openshift-cicd-demo
     $ demo.sh install
     ```
 
@@ -58,7 +58,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 1. Check pipeline run logs
 
     ```
-    $ tkn pipeline logs petclinic-deploy-dev -n NAMESPACE
+    $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
     ```
 
 ![Pipeline Diagram](docs/images/pipeline-viz.png)
