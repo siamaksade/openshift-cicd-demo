@@ -88,7 +88,9 @@ command.install() {
   info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
   oc label ns $dev_prj argocd.argoproj.io/managed-by=$cicd_prj
   oc label ns $stage_prj argocd.argoproj.io/managed-by=$cicd_prj
-  
+  oc patch cm/argocd-rbac-cm -n $cicd_prj --type=merge -p '{"data":{"policy.default":"role:admin"}}'
+
+
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
   GOGS_HOSTNAME=$(oc get route gogs -o template --template='{{.spec.host}}' -n $cicd_prj)
@@ -129,10 +131,6 @@ spec:
     repoURL: http://$GOGS_HOSTNAME/gogs/spring-petclinic-config
 EOF
   oc apply -k argo -n $cicd_prj
-  oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $dev_prj
-  oc policy add-role-to-user admin system:serviceaccount:$cicd_prj:argocd-argocd-application-controller -n $stage_prj
-  sed "s/demo-cicd/$cicd_prj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $dev_prj
-  sed "s/demo-cicd/$cicd_prj/g" argo/argocd-sa-roles.yaml | oc apply -f - -n $stage_prj
 
 cat <<EOF | kubectl apply -n $cicd_prj -f -
 kind: Secret
@@ -180,7 +178,7 @@ EOF
   Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
-  Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [admin pwd: $(oc get secret argocd-cluster -n $cicd_prj -ojsonpath='{.data.admin\.password}' | base64 -d)]
+  Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [login with OpenShift credentials]
 
 ############################################################################
 ############################################################################
