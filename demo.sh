@@ -36,7 +36,7 @@ while (( "$#" )); do
     -*|--*)
       err "Error: Unsupported flag $1"
       ;;
-    *) 
+    *)
       break
   esac
 done
@@ -50,10 +50,10 @@ command.help() {
 
   Usage:
       demo [command] [options]
-  
+
   Example:
       demo install --project-prefix mydemo
-  
+
   COMMANDS:
       install                        Sets up the demo and creates namespaces
       uninstall                      Deletes the demo
@@ -69,14 +69,14 @@ command.install() {
   oc version >/dev/null 2>&1 || err "no oc binary found"
 
   info "Creating namespaces $cicd_prj, $dev_prj, $stage_prj"
-  oc get ns $cicd_prj 2>/dev/null  || { 
-    oc new-project $cicd_prj 
+  oc get ns $cicd_prj 2>/dev/null  || {
+    oc new-project $cicd_prj
   }
-  oc get ns $dev_prj 2>/dev/null  || { 
+  oc get ns $dev_prj 2>/dev/null  || {
     oc new-project $dev_prj
   }
-  oc get ns $stage_prj 2>/dev/null  || { 
-    oc new-project $stage_prj 
+  oc get ns $stage_prj 2>/dev/null  || {
+    oc new-project $stage_prj
   }
 
   info "Configure service account permissions for pipeline"
@@ -93,7 +93,7 @@ command.install() {
   oc apply -f tasks -n $cicd_prj
   oc apply -f pipelines/pipeline-build-pvc.yaml -n $cicd_prj
   sed "s#https://github.com/siamaksade#http://$GOGS_HOSTNAME/gogs#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
-  
+
   oc apply -f triggers -n $cicd_prj
 
   info "Initiatlizing git repository in Gogs and configuring webhooks"
@@ -154,18 +154,18 @@ EOF
 
   1) Go to spring-petclinic Git repository in Gogs:
      http://$GOGS_HOSTNAME/gogs/spring-petclinic.git
-  
+
   2) Log into Gogs with username/password: gogs/gogs
-      
+
   3) Edit a file in the repository and commit to trigger the pipeline
 
   4) Check the pipeline run logs in Dev Console or Tekton CLI:
-     
-    \$ tkn pipeline logs petclinic-deploy-dev -f -n $cicd_prj
 
-  
+    \$ tkn pipeline logs petclinic-build -L -f -n $cicd_prj
+
+
   You can find further details at:
-  
+
   Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
