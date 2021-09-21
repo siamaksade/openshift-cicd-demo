@@ -44,3 +44,9 @@ spec:
       enabled: false
     route:
       enabled: true
+  sso:
+    provider: keycloak
+    verifyTLS: false
+    resources:
+      requests:
+        cpu: 400m        
