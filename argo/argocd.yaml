@@ -5,9 +5,6 @@ metadata:
   - argoproj.io/finalizer
   name: argocd
 spec:
-  controller:
-    processors: {}
-  dex: {}
   grafana:
     enabled: false
     ingress:
@@ -23,9 +20,6 @@ spec:
       enabled: false
     route:
       enabled: false
-  rbac: {}
-  redis: {}
-  repo: {}
   resourceExclusions: |
     - apiGroups:
       - tekton.dev
@@ -44,9 +38,18 @@ spec:
       enabled: false
     route:
       enabled: true
-  sso:
-    provider: keycloak
-    verifyTLS: false
+  dex:
+    openShiftOAuth: true
     resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
       requests:
-        cpu: 400m        
+        cpu: 250m
+        memory: 128Mi
+  rbac:
+    defaultPolicy: 'role:readonly'
+    policy: |
+      g, system:cluster-admins, role:admin
+      g, ocp-admins, role:admin
+    scopes: '[groups]'

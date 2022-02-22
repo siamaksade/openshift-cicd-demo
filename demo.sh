@@ -88,8 +88,6 @@ command.install() {
   info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
   oc label ns $dev_prj argocd.argoproj.io/managed-by=$cicd_prj
   oc label ns $stage_prj argocd.argoproj.io/managed-by=$cicd_prj
-  oc patch cm/argocd-rbac-cm -n $cicd_prj --type=merge -p '{"data":{"policy.default":"role:admin"}}'
-
 
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
@@ -144,6 +142,9 @@ data:
   server: $(echo -n "https://kubernetes.default.svc" | base64)
 type: Opaque
 EOF
+
+#   oc patch cm/argocd-rbac-cm -n $cicd_prj --type=merge -p '{"data":{"policy.default":"role:admin"}}'
+
 
   info "Wait for Argo CD route..."
 

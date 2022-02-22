@@ -1,5 +1,5 @@
 ---
-apiVersion: triggers.tekton.dev/v1alpha1
+apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: webhook
@@ -8,8 +8,12 @@ spec:
   triggers:
     - name: petclinic-webhook
       interceptors:
-        - cel:
-            overlays:
+        - name: "add short sha"
+          ref:
+            name: "cel"
+          params:
+          - name: "overlays"
+            value:
             - key: short_sha
               expression: "body.after.truncate(7)"
             - key: branch_name
