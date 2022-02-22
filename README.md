@@ -16,8 +16,8 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Prerequisites
 
-* OpenShift Pipelines 1.5
-* OpenShift GitOps 1.2
+* OpenShift Pipelines 1.6
+* OpenShift GitOps 1.4
 ## Continuous Integration
 
 On every push to the `spring-petclinic` git repository on Gogs git server, the following steps are executed within the Tekton pipeline:
