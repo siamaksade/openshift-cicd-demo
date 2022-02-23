@@ -105,6 +105,8 @@ command.install() {
   oc rollout status deployment/gogs -n $cicd_prj
   oc create -f config/gogs-init-taskrun.yaml -n $cicd_prj
 
+  sleep 10
+
   info "Configure Argo CD"
   cat << EOF > argo/tmp-argocd-app-patch.yaml
 ---
@@ -129,22 +131,6 @@ spec:
     repoURL: http://$GOGS_HOSTNAME/gogs/spring-petclinic-config
 EOF
   oc apply -k argo -n $cicd_prj
-
-cat <<EOF | kubectl apply -n $cicd_prj -f -
-kind: Secret
-apiVersion: v1
-metadata:
-  name: argocd-default-cluster-config
-data:
-  config: $(echo -n '{"tlsClientConfig":{"insecure":false}}' | base64)
-  name: $(echo -n "in-cluster" | base64)
-  namespaces: $(echo -n "$cicd_prj,$dev_prj,$stage_prj" | base64)
-  server: $(echo -n "https://kubernetes.default.svc" | base64)
-type: Opaque
-EOF
-
-#   oc patch cm/argocd-rbac-cm -n $cicd_prj --type=merge -p '{"data":{"policy.default":"role:admin"}}'
-
 
   info "Wait for Argo CD route..."
 

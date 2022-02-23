@@ -1,25 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ArgoCD
 metadata:
-  finalizers:
-  - argoproj.io/finalizer
   name: argocd
 spec:
-  grafana:
-    enabled: false
-    ingress:
-      enabled: false
-    route:
-      enabled: false
-  ha:
-    enabled: false
-  initialSSHKnownHosts: {}
-  prometheus:
-    enabled: false
-    ingress:
-      enabled: false
-    route:
-      enabled: false
   resourceExclusions: |
     - apiGroups:
       - tekton.dev
@@ -29,24 +12,10 @@ spec:
       - TaskRun
       - PipelineRun
   server:
-    autoscale:
-      enabled: false
-    grpc:
-      ingress:
-        enabled: false
-    ingress:
-      enabled: false
     route:
       enabled: true
   dex:
     openShiftOAuth: true
-    resources:
-      limits:
-        cpu: 500m
-        memory: 256Mi
-      requests:
-        cpu: 250m
-        memory: 128Mi
   rbac:
     defaultPolicy: 'role:readonly'
     policy: |
