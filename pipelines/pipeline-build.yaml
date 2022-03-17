@@ -75,11 +75,25 @@ spec:
       - -Dsonar.host.url=http://sonarqube:9000
       - -Dsonar.userHome=/tmp/sonar
       - -DskipTests=true
+  - name: security-scan
+    taskRef:
+      name: maven
+    runAfter:
+      - unit-tests
+    workspaces:
+    - name: source
+      workspace: workspace
+    - name: maven-settings
+      workspace: maven-settings
+    params:
+    - name: GOALS
+      value: ["--version", "-f", "spring-petclinic"]
   - name: release-app
     taskRef:
       name: maven
     runAfter:
       - code-analysis
+      - security-scan
     workspaces:
     - name: source
       workspace: workspace
@@ -136,3 +150,7 @@ spec:
     workspaces:
     - name: workspace
       workspace: workspace
+  results:
+  - name: app-image
+    description: The image built in the pipeline
+    value: image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/spring-petclinic@$(tasks.build-image.results.IMAGE_DIGEST)"
