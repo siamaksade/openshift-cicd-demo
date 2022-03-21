@@ -92,3 +92,19 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 **Q: Why am I getting `unable to recognize "tasks/task.yaml": no matches for kind "Task" in version "tekton.dev/v1beta1"` errors?**
 
 You might have just installed the OpenShift Pipelines operator on the cluster and the operator has not finished installing Tekton on the cluster yet. Wait a few minutes for the operator to finish and then install the demo.
+
+
+**Q: why do I get `Unable to deploy revision: permission denied` when I manually sync an Application in Argo CD dashboard?**
+
+When you log into Argo CD dashboard using your OpenShift credentials, your access rights in Argo CD will be assigned based on your access rights in OpenShift. The Argo CD instance in this demo is [configured](https://github.com/siamaksade/openshift-cicd-demo/blob/main/argo/argocd.yaml#L21) to map `kubeadmin` and any users in the `ocp-admins` groups in OpenShift to an Argo CD admin user. Note that `ocp-admins` group is not available in OpenShift by default. You can create this group using the following commands:
+
+```
+# create ocp-admins group
+oc adm groups new ocp-admins
+
+# give cluster admin rightsto ocp-admins group
+oc adm policy add-cluster-role-to-group cluster-admin ocp-admins
+
+# add username to ocp-admins group
+oc adm groups add-users ocp-admins USERNAME
+```
