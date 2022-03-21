@@ -154,3 +154,22 @@ spec:
     workspaces:
     - name: workspace
       workspace: workspace
+  - name: create-promote-pr
+    runAfter:
+    - update-deployment
+    taskRef:
+      name: create-promote-pull-request
+    params:
+      - name: GIT_REPOSITORY
+        value: "$(params.APP_MANIFESTS_GIT)"
+      - name: GIT_USERNAME
+        value: gitea
+      - name: GIT_PASSWORD
+        value: openshift
+      - name: COPY_FROM_PATH
+        value: environments/dev
+      - name: COPY_TO_PATH
+        value: environments/stage
+    workspaces:
+    - name: workspace
+      workspace: workspace

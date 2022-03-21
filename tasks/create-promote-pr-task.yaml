@@ -1,0 +1,88 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    tekton.dev/pipelines.minVersion: 0.12.1
+    tekton.dev/tags: git
+  name: create-promote-pull-request
+  labels:
+    app.kubernetes.io/version: '0.1'
+    operator.tekton.dev/provider-type: community
+spec:
+  description: This Task can be used to update image digest in a Git repo using kustomize
+  params:
+    - name: GIT_REPOSITORY
+      type: string
+    - name: GIT_USERNAME
+      type: string
+    - name: GIT_PASSWORD
+      type: string
+    - name: COPY_FROM_PATH
+      type: string
+    - name: COPY_TO_PATH
+      type: string
+  workspaces:
+    - description: The workspace consisting of maven project.
+      name: workspace
+  results:
+    - name: branch_name
+      description: The branch name used for pull-request
+  steps:
+    - name: promote
+      image: docker.io/alpine/git:v2.26.2
+      workingDir: $(workspaces.workspace.path)
+      script: |
+        set -x
+        rm -rf pull-request-workdir
+        git clone $(params.GIT_REPOSITORY) pull-request-workdir
+        cd pull-request-workdir
+        git config user.email "pipelines-ci@redhat.com"
+        git config user.name "pipelines-ci"
+
+        branch_name=ci-$(context.taskRun.name)
+        git checkout -b $branch_name
+        echo -n "$branch_name" > $(results.branch_name.path)
+
+        /bin/cp -rf $(params.COPY_FROM_PATH)/* $(params.COPY_TO_PATH)
+
+        git status
+        git add $(params.COPY_TO_PATH)
+        git commit -m "[$(context.taskRun.name)] Promotion from $(params.COPY_FROM_PATH) to $(params.COPY_TO_PATH)"
+
+        git remote add auth-origin $(echo $(params.GIT_REPOSITORY) | sed -E "s#http://(.*)#http://$(params.GIT_USERNAME):$(params.GIT_PASSWORD)@\1#g")
+        git push -u auth-origin HEAD
+    - name: create-pull-request
+      workingDir: $(workspaces.workspace.path)
+      image: quay.io/siamaksade/python-oc
+      script: |
+        #!/usr/bin/env python3
+
+        import os
+        import requests 
+
+        gitea_user = "$(params.GIT_USERNAME)"
+        gitea_pwd = "$(params.GIT_PASSWORD)"
+        giteaURL = "http://" + os.popen('oc get svc gitea -o template --template="{{.spec.clusterIP}}"').read() + ":3000"
+        
+        branch_result = open("$(results.branch_name.path)")
+        git_branch = branch_result.read()
+        branch_result.close()
+
+        print("Git server: " + giteaURL)
+        print("Branch name: " + git_branch)
+
+        pr_title = "[$(context.taskRun.name)] Promote to STAGE environment"
+        pr_body = "TaskRun $(context.taskRun.name)\\nPromoting application from DEV to STAGE environment"
+        data_pr = '{"base": "master","body": "' + pr_body + '","head": "' + git_branch + '","title": "' + pr_title + '"}'
+        headers = {'Content-Type': 'application/json'}
+        resp = requests.post(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic-config/pulls", 
+                            headers = headers, 
+                            auth = (gitea_user, gitea_pwd), 
+                            data = data_pr) 
+                             
+
+        if resp.status_code != 200:
+          print("Error creating pull-request (status code: {})".format(resp.status_code))
+          print(resp.content)
+        else:
+          print("Created pull-request.")

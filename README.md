@@ -27,6 +27,7 @@ On every push to the `spring-petclinic` git repository on Gitea git server, the 
 1. Application is packaged as a JAR and released to Sonatype Nexus snapshot repository
 1. A container image is built in DEV environment using S2I, and pushed to OpenShift internal registry, and tagged with `spring-petclinic:[branch]-[commit-sha]` and `spring-petclinic:latest`
 1. Kubernetes manifests are updated in the Git repository with the image digest that was built within the pipeline
+1. A pull-requested is created on config repo for merging the image digest update into the STAGE environment
 
 ![Pipeline Diagram](docs/images/ci-pipeline.svg)
 
@@ -75,13 +76,16 @@ Argo CD continuously monitor the configurations stored in the Git repository and
    ```text
    $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
    ```
-1. Once the pipeline finishes successfully, the image reference in the `spring-petclinic-config/environments/dev` are updated with the new image digest and automatically deployed to the DEV environment by Argo CD. 
+
+1. Once the pipeline finishes successfully, the image reference in the `spring-petclinic-config/environments/dev` are updated with the new image digest and automatically deployed to the DEV environment by Argo CD. If Argo CD hasn't polled the Git repo for changes yet, click on the "Refresh" button on the Argo CD application.
 
 1. Login into Argo CD dashboard and check the sync history of `dev-spring-petclinic` application to verify the recent deployment
 
-1. Copy the `kustomization.yaml` file from the `spring-petclinic-config/environments/dev` to  `spring-petclinic-config/environments/stage` in order to promote the image to the staging environment. 
+1. Go to the pull requests tab on `spring-petclinic-config` Git repository in Gitea and merge the pull-requested that is generated for promotion from DEV to STAGE
 
-1. Check the sync history of `stage-spring-petclinic` application in Argo CD dashboard to verify the recent deployment to the staging environment.
+    ![Promotion Pull-Request](docs/images/promote-pr.png)
+
+1. Check the sync history of `stage-spring-petclinic` application in Argo CD dashboard to verify the recent deployment to the staging environment. If Argo CD hasn't polled the Git repo for changes yet, click on the "Refresh" button on the Argo CD application.
 
 ## Troubleshooting
 
