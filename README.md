@@ -65,7 +65,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 ![Argo CD](docs/images/argocd.png)
 
-## Trigger Pipeline
+## Demo Instructions
 
 1. Go to spring-petclinic Git repository in Gitea
 1. Log into Gitea with username/password: `gitea`/`openshift`
@@ -75,6 +75,13 @@ Argo CD continuously monitor the configurations stored in the Git repository and
    ```text
    $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
    ```
+1. Once the pipeline finishes successfully, the image reference in the `spring-petclinic-config/environments/dev` are updated with the new image digest and automatically deployed to the DEV environment by Argo CD. 
+
+1. Login into Argo CD dashboard and check the sync history of `dev-spring-petclinic` application to verify the recent deployment
+
+1. Copy the `kustomization.yaml` file from the `spring-petclinic-config/environments/dev` to  `spring-petclinic-config/environments/stage` in order to promote the image to the staging environment. 
+
+1. Check the sync history of `stage-spring-petclinic` application in Argo CD dashboard to verify the recent deployment to the staging environment.
 
 ## Troubleshooting
 
