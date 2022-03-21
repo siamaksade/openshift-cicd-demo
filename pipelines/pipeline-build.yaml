@@ -23,6 +23,10 @@ spec:
   workspaces:
   - name: workspace
   - name: maven-settings
+  results:
+    - name: app-image
+      description: The image built in the pipeline
+      value: image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/spring-petclinic@$(tasks.build-image.results.IMAGE_DIGEST)
   tasks:
   - name: source-clone
     taskRef:
@@ -136,9 +140,9 @@ spec:
       - name: GIT_REPOSITORY
         value: "$(params.APP_MANIFESTS_GIT)"
       - name: GIT_USERNAME
-        value: gogs
+        value: gitea
       - name: GIT_PASSWORD
-        value: gogs
+        value: openshift
       - name: CURRENT_IMAGE
         value: quay.io/siamaksade/spring-petclinic:latest
       - name: NEW_IMAGE
@@ -150,7 +154,3 @@ spec:
     workspaces:
     - name: workspace
       workspace: workspace
-  results:
-  - name: app-image
-    description: The image built in the pipeline
-    value: image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/spring-petclinic@$(tasks.build-image.results.IMAGE_DIGEST)"
