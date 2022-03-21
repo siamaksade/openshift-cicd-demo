@@ -5,7 +5,7 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 * 3 namespaces for CI/CD, DEV and STAGE projects
 * 1 Tekton pipeline for building the application image on every Git commit
 * Argo CD (username/password: `admin`/[_retrieve from the cluster_])
-* Gitea git server (username/password: `gita`/`openshift`)
+* Gitea git server (username/password: `gitea`/`openshift`)
 * Sonatype Nexus (username/password: `admin`/`admin123`)
 * SonarQube (username/password: `admin`/`admin`)
 * Git webhooks for triggering the CI pipeline
