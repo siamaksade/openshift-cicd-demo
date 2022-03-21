@@ -5,7 +5,7 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 * 3 namespaces for CI/CD, DEV and STAGE projects
 * 1 Tekton pipeline for building the application image on every Git commit
 * Argo CD (username/password: `admin`/[_retrieve from the cluster_])
-* Gogs git server (username/password: `gogs`/`gogs`)
+* Gitea git server (username/password: `gita`/`openshift`)
 * Sonatype Nexus (username/password: `admin`/`admin123`)
 * SonarQube (username/password: `admin`/`admin`)
 * Git webhooks for triggering the CI pipeline
@@ -20,9 +20,9 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 * OpenShift GitOps 1.4
 ## Continuous Integration
 
-On every push to the `spring-petclinic` git repository on Gogs git server, the following steps are executed within the Tekton pipeline:
+On every push to the `spring-petclinic` git repository on Gitea git server, the following steps are executed within the Tekton pipeline:
 
-1. Code is cloned from Gogs git server and the unit-tests are run
+1. Code is cloned from Gitea git server and the unit-tests are run
 1. Unit tests are executed and in parallel the code is analyzed by SonarQube for anti-patterns, and a dependency report is generated
 1. Application is packaged as a JAR and released to Sonatype Nexus snapshot repository
 1. A container image is built in DEV environment using S2I, and pushed to OpenShift internal registry, and tagged with `spring-petclinic:[branch]-[commit-sha]` and `spring-petclinic:latest`
@@ -49,7 +49,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
     $ demo.sh install
     ```
 
-1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gogs, or run the following:
+1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gitea, or run the following:
 
     ```text
     $ demo.sh start
@@ -67,8 +67,8 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 ## Trigger Pipeline
 
-1. Go to spring-petclinic Git repository in Gogs
-1. Log into Gogs with username/password: `gogs`/`gogs`
+1. Go to spring-petclinic Git repository in Gitea
+1. Log into Gitea with username/password: `gitea`/`openshift`
 1. Edit a file in the repository and commit to trigger the pipeline
 1. Check the pipeline run logs in Dev Console or Tekton CLI:
 

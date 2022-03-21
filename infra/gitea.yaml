@@ -1,0 +1,292 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: gitea
+  name: gitea
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    description: Exposes the database server
+  name: gitea-postgresql
+spec:
+  ports:
+  - name: postgresql
+    port: 5432
+    targetPort: 5432
+  selector:
+    name: gitea-postgresql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-postgresql
+  annotations:
+    image.openshift.io/triggers: >-
+        [{"from":{"kind":"ImageStreamTag","name":"postgresql:latest", "namespace":"openshift"},"fieldPath":"spec.template.spec.containers[?(@.name==\"postgresql\")].image"}]
+  labels:
+    app: gitea
+    app.kubernetes.io/component: database
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/name: gitea-postgresql
+    app.kubernetes.io/part-of: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+      name: gitea-postgresql
+  template:
+    metadata:
+      labels:
+        app: gitea
+        name: gitea-postgresql
+    spec:
+      containers:
+      - name: postgresql
+        imagePullPolicy: Always
+        image: postgresql:latest
+        env:
+        - name: POSTGRESQL_USER
+          value: gitea
+        - name: POSTGRESQL_PASSWORD
+          value: gitea
+        - name: POSTGRESQL_DATABASE
+          value: gitea
+        - name: POSTGRESQL_MAX_CONNECTIONS
+          value: "100"
+        - name: POSTGRESQL_SHARED_BUFFERS
+          value: 12MB
+        - name: POSTGRESQL_ADMIN_PASSWORD
+          value: gitea
+        ports:
+        - containerPort: 5432
+        livenessProbe:
+          initialDelaySeconds: 30
+          tcpSocket:
+            port: 5432
+          timeoutSeconds: 1
+          failureThreshold: 10
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -i
+            - -c
+            - psql -h 127.0.0.1 -U ${POSTGRESQL_USER} -q -d ${POSTGRESQL_DATABASE} -c 'SELECT 1'
+        resources:
+          limits:
+            memory: 512Mi
+        volumeMounts:
+        - mountPath: /var/lib/pgsql/data
+          name: gitea-postgres-data
+      volumes:
+      - name: gitea-postgres-data
+        persistentVolumeClaim:
+          claimName: gitea-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    description: The Gitea server's http port
+    service.alpha.openshift.io/dependencies: '[{"name":"gitea-postgresql","namespace":"","kind":"Service"}]'
+  labels:
+    app: gitea
+  name: gitea
+spec:
+  ports:
+  - name: 3000-tcp
+    port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: gitea
+    name: gitea
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: route.openshift.io/v1
+id: gitea-http
+kind: Route
+metadata:
+  annotations:
+    description: Route for application's http service.
+  labels:
+    app: gitea
+  name: gitea
+spec:
+  to:
+    name: gitea
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  labels:
+    app: gitea
+    app.kubernetes.io/component: gitea
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/name: gitea
+    app.kubernetes.io/part-of: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+      name: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+        name: gitea
+    spec:
+      containers:
+      - name: gitea
+        imagePullPolicy: Always
+        image: quay.io/gpte-devops-automation/gitea:1.15.10
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /gitea-repositories
+          name: gitea-repositories
+        - mountPath: /home/gitea/conf
+          name: gitea-config
+        readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            successThreshold: 1
+            timeoutSeconds: 1
+        livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+      serviceAccountName: gitea
+      volumes:
+      - name: gitea-repositories
+        persistentVolumeClaim:
+          claimName: gitea-repositories
+      - configMap:
+          items:
+          - key: app.ini
+            path: app.ini
+          name: gitea-config
+        name: gitea-config
+# ---
+# apiVersion: apps.openshift.io/v1
+# kind: DeploymentConfig
+# metadata:
+#   labels:
+#     app: gitea
+#   name: gitea
+# spec:
+#   replicas: 1
+#   selector:
+#     app: gitea
+#     deploymentconfig: gitea
+#   strategy:
+#     resources: {}
+#     rollingParams:
+#       intervalSeconds: 1
+#       maxSurge: 25%
+#       maxUnavailable: 25%
+#       timeoutSeconds: 600
+#       updatePeriodSeconds: 1
+#     type: Rolling
+#   template:
+#     metadata:
+#       creationTimestamp: null
+#       labels:
+#         app: gitea
+#         deploymentconfig: gitea
+#     spec:
+#       containers:
+#       - image: quay.io/gpte-devops-automation/gitea:1.15.10
+#         imagePullPolicy: Always
+#         livenessProbe:
+#           failureThreshold: 3
+#           httpGet:
+#             path: /
+#             port: 3000
+#             scheme: HTTP
+#           initialDelaySeconds: 30
+#           periodSeconds: 10
+#           successThreshold: 1
+#           timeoutSeconds: 1
+#         name: gitea
+#         ports:
+#         - containerPort: 3000
+#           protocol: TCP
+#         readinessProbe:
+#           failureThreshold: 3
+#           httpGet:
+#             path: /
+#             port: 3000
+#             scheme: HTTP
+#           initialDelaySeconds: 5
+#           periodSeconds: 20
+#           successThreshold: 1
+#           timeoutSeconds: 1
+#         resources: {}
+#         terminationMessagePath: /dev/termination-log
+#         volumeMounts:
+#         - mountPath: /gitea-repositories
+#           name: gitea-repositories
+#         - mountPath: /home/gitea/conf
+#           name: gitea-config
+#       dnsPolicy: ClusterFirst
+#       restartPolicy: Always
+#       securityContext: {}
+#       serviceAccountName: gitea
+#       terminationGracePeriodSeconds: 30
+#       volumes:
+#       - name: gitea-repositories
+#         persistentVolumeClaim:
+#           claimName: gitea-repositories
+#       - configMap:
+#           items:
+#           - key: app.ini
+#             path: app.ini
+#           name: gitea-config
+#         name: gitea-config
+#   test: false
+#   triggers:
+#   - type: ConfigChange
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-repositories
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-postgres-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

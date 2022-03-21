@@ -91,19 +91,19 @@ command.install() {
 
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
-  GOGS_HOSTNAME=$(oc get route gogs -o template --template='{{.spec.host}}' -n $cicd_prj)
+  GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
 
   info "Deploying pipeline and tasks to $cicd_prj namespace"
   oc apply -f tasks -n $cicd_prj
   oc apply -f pipelines/pipeline-build-pvc.yaml -n $cicd_prj
-  sed "s#https://github.com/siamaksade#http://$GOGS_HOSTNAME/gogs#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
+  sed "s#https://github.com/siamaksade#http://$GITEA_HOSTNAME/gitea#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
 
   oc apply -f triggers -n $cicd_prj
 
-  info "Initiatlizing git repository in Gogs and configuring webhooks"
-  sed "s/@HOSTNAME/$GOGS_HOSTNAME/g" config/gogs-configmap.yaml | oc create -f - -n $cicd_prj
-  oc rollout status deployment/gogs -n $cicd_prj
-  oc create -f config/gogs-init-taskrun.yaml -n $cicd_prj
+  info "Initiatlizing git repository in Gitea and configuring webhooks"
+  sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml | oc create -f - -n $cicd_prj
+  oc rollout status deployment/gitea -n $cicd_prj
+  oc create -f config/gitea-init-taskrun.yaml -n $cicd_prj
 
   sleep 10
 
@@ -118,7 +118,7 @@ spec:
   destination:
     namespace: $dev_prj
   source:
-    repoURL: http://$GOGS_HOSTNAME/gogs/spring-petclinic-config
+    repoURL: http://$GITEA_HOSTNAME/gitea/spring-petclinic-config
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -128,7 +128,7 @@ spec:
   destination:
     namespace: $stage_prj
   source:
-    repoURL: http://$GOGS_HOSTNAME/gogs/spring-petclinic-config
+    repoURL: http://$GITEA_HOSTNAME/gitea/spring-petclinic-config
 EOF
   oc apply -k argo -n $cicd_prj
 
@@ -148,10 +148,10 @@ EOF
 
   Demo is installed! Give it a few minutes to finish deployments and then:
 
-  1) Go to spring-petclinic Git repository in Gogs:
-     http://$GOGS_HOSTNAME/gogs/spring-petclinic.git
+  1) Go to spring-petclinic Git repository in Gitea:
+     http://$GITEA_HOSTNAME/gitea/spring-petclinic.git
 
-  2) Log into Gogs with username/password: gogs/gogs
+  2) Log into Gitea with username/password: gitea/gitea
 
   3) Edit a file in the repository and commit to trigger the pipeline
 
@@ -162,7 +162,7 @@ EOF
 
   You can find further details at:
 
-  Gogs Git Server: http://$GOGS_HOSTNAME/explore/repos
+  Gitea Git Server: http://$GITEA_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
   Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [login with OpenShift credentials]
