@@ -24,9 +24,9 @@ spec:
   - name: workspace
   - name: maven-settings
   results:
-    - name: app-image
-      description: The image built in the pipeline
-      value: image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/spring-petclinic@$(tasks.build-image.results.IMAGE_DIGEST)
+    - name: app-image-digest
+      description: The image digest built in the pipeline
+      value: $(tasks.build-image.results.IMAGE_DIGEST)
   tasks:
   - name: source-clone
     taskRef:
