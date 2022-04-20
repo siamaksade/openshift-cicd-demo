@@ -44,5 +44,11 @@ spec:
         configMap:
           name: maven-settings
       - name: workspace
-        persistentVolumeClaim:
-          claimName: petclinic-build-workspace
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+            volumeMode: Filesystem
