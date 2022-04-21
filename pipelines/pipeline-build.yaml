@@ -24,9 +24,12 @@ spec:
   - name: workspace
   - name: maven-settings
   results:
-    - name: app-image-digest
+    - name: APP_IMAGE_DIGETST
       description: The image digest built in the pipeline
       value: $(tasks.build-image.results.IMAGE_DIGEST)
+    - name: APP_IMAGE_URL
+      description: The image url built in the pipeline
+      value: $(tasks.build-image.results.IMAGE_NAME)
   tasks:
   - name: source-clone
     taskRef:
