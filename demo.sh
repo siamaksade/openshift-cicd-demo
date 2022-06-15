@@ -85,10 +85,6 @@ command.install() {
   oc policy add-role-to-user system:image-puller system:serviceaccount:$dev_prj:default -n $cicd_prj
   oc policy add-role-to-user system:image-puller system:serviceaccount:$stage_prj:default -n $cicd_prj
 
-  info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
-  oc label ns $dev_prj argocd.argoproj.io/managed-by=$cicd_prj
-  oc label ns $stage_prj argocd.argoproj.io/managed-by=$cicd_prj
-
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
@@ -137,6 +133,10 @@ EOF
   do
     sleep 3
   done
+
+  info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
+  oc label ns $dev_prj argocd.argoproj.io/managed-by=$cicd_prj
+  oc label ns $stage_prj argocd.argoproj.io/managed-by=$cicd_prj
 
   oc project $cicd_prj
 
