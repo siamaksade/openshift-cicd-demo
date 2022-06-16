@@ -150,7 +150,7 @@ EOF
   1) Go to spring-petclinic Git repository in Gitea:
      http://$GITEA_HOSTNAME/gitea/spring-petclinic.git
 
-  2) Log into Gitea with username/password: gitea/gitea
+  2) Log into Gitea with username/password: gitea/openshift
 
   3) Edit a file in the repository and commit to trigger the pipeline
 
