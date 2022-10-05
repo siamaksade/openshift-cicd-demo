@@ -96,13 +96,61 @@ command.install() {
   oc apply -f triggers -n $cicd_prj
 
   info "Initiatlizing git repository in Gitea and configuring webhooks"
+  WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"  --ignore-not-found)
+  if [ -z "$WEBHOOK_URL" ]; then 
+      WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n openshift-pipelines -o template --template="{{.spec.host}}")
+  fi
+
   sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml | oc create -f - -n $cicd_prj
   oc rollout status deployment/gitea -n $cicd_prj
-  oc create -f config/gitea-init-taskrun.yaml -n $cicd_prj
+  sed "s#@webhook-url@#$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | oc apply -f - -n $cicd_prj
+
+
+  sleep 10
+  while oc get taskrun -n $cicd_prj | grep Running >/dev/null 2>/dev/null
+  do
+    sleep 5
+  done
+
+  info "Configuring pipelines-as-code"
+  TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name})
+  GITEAN_TOKEN=$(oc logs $TASKRUN_NAME-pod -n $cicd_prj )
+  # serach for Token: 
+
+cat << EOF > /tmp/tmp-pac-repository.yaml
+---
+apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
+kind: Repository
+metadata:
+  name: spring-petclinic
+spec:
+  url: http://$GITEA_HOSTNAME/gitea/spring-petclinic
+  git_provider:
+    user: "git"
+    url: http://$GITEA_HOSTNAME
+    secret:
+      name: "gitea"
+      key: token
+    webhook_secret:
+      name: "gitea"
+      key: "webhook"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea
+type: Opaque
+stringData:
+  token: "$GITEA_TOKEN"
+  webhook: ""
+        """
+EOF
+  oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
 
   sleep 10
 
   info "Configure Argo CD"
+
   cat << EOF > argo/tmp-argocd-app-patch.yaml
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -191,3 +239,35 @@ main() {
 }
 
 main
+
+
+
+
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: gitea-token
+# type: Opaque
+# stringData:
+#   token: "4ce5e96fcb814e9665fda53adf9ee12924105040"
+#   webhook: ""
+
+# apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
+# kind: Repository
+# metadata:
+#   name: spring-petclinic
+# spec:
+#   url: http://gitea-a2-cicd.apps.siamak.devcluster.openshift.com/gitea/spring-petclinic
+#   git_provider:
+#     user: "git"
+#     url: http://gitea-a2-cicd.apps.siamak.devcluster.openshift.com
+#     secret:
+#       name: gitea-token
+#       key: "token"
+#     webhook_secret:
+#       name: gitea-token
+#       key: "webhook"
+
+#           webhookURL = "http://" + os.popen('oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"').read()
+#           if webhookURL == "":
+#             webhookURL = "http://" + os.popen('oc get route pipelines-as-code-controller -n openshift-pipelines -o template --template="{{.spec.host}}"').read()
