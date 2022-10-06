@@ -108,31 +108,30 @@ command.install() {
   done
 
   # update pipelinerun and branch
-  tmp_dir=$(mktemp -d)
-  pushd $tmp_dir
-  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
-  cd spring-petclinic 
-  git config user.email "openshift-pipelines@redhat.com"
-  git config user.name "openshift-pipelines"
+  # tmp_dir=$(mktemp -d)
+  # pushd $tmp_dir
+  # git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  # cd spring-petclinic 
+  # git config user.email "openshift-pipelines@redhat.com"
+  # git config user.name "openshift-pipelines"
 
-  sed -i "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+  # sed -i "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
 
-  git status
-  git add $(params.KUSTOMIZATION_PATH)/kustomization.yaml
-  git commit -m "[$(context.taskRun.name)] Image digest updated"
-  # git commit -m "[${PIPELINERUN_NAME}] Image digest updated"
+  # git status
+  # git add $(params.KUSTOMIZATION_PATH)/kustomization.yaml
+  # git commit -m "[$(context.taskRun.name)] Image digest updated"
 
-  git remote add auth-origin $(echo $(params.GIT_REPOSITORY) | sed -E "s#http://(.*)#http://$(params.GIT_USERNAME):$(params.GIT_PASSWORD)@\1#g")
-  git push auth-origin master
+  # # git remote add auth-origin $(echo $(params.GIT_REPOSITORY) | sed -E "s#http://(.*)#http://$(params.GIT_USERNAME):$(params.GIT_PASSWORD)@\1#g")
+  # # git push auth-origin master
 
-  RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
-  EXIT_CODE="$?"
-  if [ "$EXIT_CODE" != 0 ]
-  then
-    exit $EXIT_CODE
-  fi
-  # Make sure we don't add a trailing newline to the result!
-  echo -n "$RESULT_SHA" > $(results.commit.path)
+  # # RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+  # # EXIT_CODE="$?"
+  # # if [ "$EXIT_CODE" != 0 ]
+  # # then
+  # #   exit $EXIT_CODE
+  # # fi
+  # # Make sure we don't add a trailing newline to the result!
+  # echo -n "$RESULT_SHA" > $(results.commit.path)
 
   info "Configuring pipelines-as-code"
   TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name}")
