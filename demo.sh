@@ -89,11 +89,11 @@ command.install() {
   oc apply -f infra -n $cicd_prj
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
 
-  info "Deploying pipeline and tasks to $cicd_prj namespace"
-  oc apply -f tasks -n $cicd_prj
-  sed "s#https://github.com/siamaksade#http://$GITEA_HOSTNAME/gitea#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
+  # info "Deploying pipeline and tasks to $cicd_prj namespace"
+  # oc apply -f tasks -n $cicd_prj
+  # sed "s#https://github.com/siamaksade#http://$GITEA_HOSTNAME/gitea#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
 
-  oc apply -f triggers -n $cicd_prj
+  # oc apply -f triggers -n $cicd_prj
 
   info "Initiatlizing git repository in Gitea and configuring webhooks"
   WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"  --ignore-not-found)
@@ -103,19 +103,19 @@ command.install() {
 
   sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml | oc create -f - -n $cicd_prj
   oc rollout status deployment/gitea -n $cicd_prj
-  sed "s#@webhook-url@#$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | oc apply -f - -n $cicd_prj
+  sed "s#@webhook-url@#https://$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | oc create -f - -n $cicd_prj
 
 
   sleep 10
   while oc get taskrun -n $cicd_prj | grep Running >/dev/null 2>/dev/null
   do
+    echo "waiting for Gogs init..."
     sleep 5
   done
 
   info "Configuring pipelines-as-code"
-  TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name})
-  GITEAN_TOKEN=$(oc logs $TASKRUN_NAME-pod -n $cicd_prj )
-  # serach for Token: 
+  TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name}")
+  GITEA_TOKEN=$(oc logs $TASKRUN_NAME-pod -n $cicd_prj | grep Token | sed 's/^## Token: \(.*\) ##$/\1/g')
 
 cat << EOF > /tmp/tmp-pac-repository.yaml
 ---
@@ -123,6 +123,7 @@ apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
 kind: Repository
 metadata:
   name: spring-petclinic
+  namespace: $cicd_prj
 spec:
   url: http://$GITEA_HOSTNAME/gitea/spring-petclinic
   git_provider:
@@ -139,11 +140,11 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: gitea
+  namespace: $cicd_prj
 type: Opaque
 stringData:
   token: "$GITEA_TOKEN"
   webhook: ""
-        """
 EOF
   oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
 
