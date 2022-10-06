@@ -89,12 +89,6 @@ command.install() {
   oc apply -f infra -n $cicd_prj
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
 
-  # info "Deploying pipeline and tasks to $cicd_prj namespace"
-  # oc apply -f tasks -n $cicd_prj
-  # sed "s#https://github.com/siamaksade#http://$GITEA_HOSTNAME/gitea#g" pipelines/pipeline-build.yaml | oc apply -f - -n $cicd_prj
-
-  # oc apply -f triggers -n $cicd_prj
-
   info "Initiatlizing git repository in Gitea and configuring webhooks"
   WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"  --ignore-not-found)
   if [ -z "$WEBHOOK_URL" ]; then 
@@ -112,6 +106,33 @@ command.install() {
     echo "waiting for Gogs init..."
     sleep 5
   done
+
+  # update pipelinerun and branch
+  tmp_dir=$(mktemp -d)
+  pushd $tmp_dir
+  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  cd spring-petclinic 
+  git config user.email "openshift-pipelines@redhat.com"
+  git config user.name "openshift-pipelines"
+
+  sed -i "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+
+  git status
+  git add $(params.KUSTOMIZATION_PATH)/kustomization.yaml
+  git commit -m "[$(context.taskRun.name)] Image digest updated"
+  # git commit -m "[${PIPELINERUN_NAME}] Image digest updated"
+
+  git remote add auth-origin $(echo $(params.GIT_REPOSITORY) | sed -E "s#http://(.*)#http://$(params.GIT_USERNAME):$(params.GIT_PASSWORD)@\1#g")
+  git push auth-origin master
+
+  RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+  EXIT_CODE="$?"
+  if [ "$EXIT_CODE" != 0 ]
+  then
+    exit $EXIT_CODE
+  fi
+  # Make sure we don't add a trailing newline to the result!
+  echo -n "$RESULT_SHA" > $(results.commit.path)
 
   info "Configuring pipelines-as-code"
   TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name}")
