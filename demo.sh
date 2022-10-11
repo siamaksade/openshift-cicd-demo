@@ -19,6 +19,21 @@ err() {
   exit 1
 }
 
+case "$OSTYPE" in
+    darwin*)  PLATFORM="OSX" ;;
+    linux*)   PLATFORM="LINUX" ;;
+    bsd*)     PLATFORM="BSD" ;;
+    *)        PLATFORM="UNKNOWN" ;;
+esac
+
+cross_sed() {
+    if [[ "$PLATFORM" == "OSX" || "$PLATFORM" == "BSD" ]]; then
+        sed -i "" "$1" "$2"
+    elif [ "$PLATFORM" == "LINUX" ]; then
+        sed -i "$1" "$2"
+    fi
+}
+
 while (( "$#" )); do
   case "$1" in
     install|uninstall|start)
@@ -107,14 +122,16 @@ command.install() {
     sleep 5
   done
 
-  # update pipelinerun and branch
+  info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
   pushd $tmp_dir
   git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
   cd spring-petclinic 
   git config user.email "openshift-pipelines@redhat.com"
   git config user.name "openshift-pipelines"
-  sed -i "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+  cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
+  cross_sed "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+  cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
   git status
   git add .tekton/build.yaml
   git commit -m "Updated manifests git url"
