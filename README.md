@@ -16,8 +16,18 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Prerequisites
 
-* OpenShift Pipelines 1.8
 * OpenShift GitOps 1.6
+* OpenShift Pipelines 1.8
+* Pipelines as code nightly release
+
+The current version of this demo requires the unreleased version of pipelines-as-code which will be included in OpenShift Pipelines 1.9. In order to install the nightly release of pipelines-as-code, run the following command:
+
+```
+kubectl patch tektonconfig config --type="merge" -p '{"spec": {"addon":{"enablePipelinesAsCode": false}}}'
+kubectl apply -f https://raw.githubusercontent.com/openshift-pipelines/pipelines-as-code/nightly/release.yaml
+```
+
+
 ## Continuous Integration
 
 On every push to the `spring-petclinic` git repository on Gitea git server, the following steps are executed within the Tekton pipeline:
