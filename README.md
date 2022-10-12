@@ -62,7 +62,13 @@ Argo CD continuously monitor the configurations stored in the Git repository and
     $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
     ```
 
-![Pipeline Diagram](docs/images/pipeline-viz.png)
+
+
+![Pipeline Diagram](docs/images/pipelines-3.png)
+
+![Pipeline Diagram](docs/images/pipelines-2.png)
+
+![Pipeline Diagram](docs/images/pipelines-1.png)
 
 ![Argo CD](docs/images/argocd.png)
 
