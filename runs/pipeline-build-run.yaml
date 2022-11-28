@@ -6,9 +6,15 @@ spec:
   pipelineRef:
     name: petclinic-build
   workspaces:
-  - name: workspace
-    persistentVolumeClaim:
-      claimName: petclinic-build-workspace
+    - name: workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+          storageClassName: gp2
   - name: maven-settings
     configMap:
       name: maven-settings
