@@ -62,12 +62,15 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gitea and commit it directly or preferrably create a pull-request for it directly via the Gitea web ui.
 
-1. Check the pipeline run logs in Dev Console or OpenShift Pipelines CLI:
+1. Check the pipeline run logs for the pull-request in Dev Console or OpenShift Pipelines CLI:
 
     ```text
     $ opc pac list -n $cicd_pr
     $ opc pac logs -n $cicd_prj
     ```
+
+1. Once happy with the pull-request, merge it via the Gitea web ui. You can now check the pipelinerun executing on the main branch for the merged pull-request.
+
 
 ![Gitea Pull Request](docs/images/gitea.png)
 
