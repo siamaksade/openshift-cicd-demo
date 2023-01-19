@@ -51,7 +51,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 1. Get an OpenShift cluster via https://try.openshift.com
 1. Install OpenShift GitOps Operator
-1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [Tekton CLI](https://github.com/tektoncd/cli/releases)
+1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [OpenShift Pipelines CLI](https://mirror.openshift.com/pub/openshift-v4/clients/pipeline/latest/)
 1. Deploy the demo
 
     ```text
@@ -60,19 +60,16 @@ Argo CD continuously monitor the configurations stored in the Git repository and
     $ demo.sh install
     ```
 
-1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gitea, or run the following:
+1. Start the deploy pipeline by making a change in the `spring-petclinic` Git repository on Gitea and commit it directly or preferrably create a pull-request for it directly via the Gitea web ui.
+
+1. Check the pipeline run logs in Dev Console or OpenShift Pipelines CLI:
 
     ```text
-    $ demo.sh start
+    $ opc pac list -n $cicd_pr
+    $ opc pac logs -n $cicd_prj
     ```
 
-1. Check pipeline run logs
-
-    ```text
-    $ tkn pipeline logs petclinic-build -L -f -n demo-cicd
-    ```
-
-
+![Gitea Pull Request](docs/images/gitea.png)
 
 ![Pipeline Diagram](docs/images/pipelines-3.png)
 

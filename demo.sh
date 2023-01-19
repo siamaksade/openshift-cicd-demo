@@ -227,11 +227,11 @@ EOF
 
   2) Log into Gitea with username/password: gitea/openshift
 
-  3) Edit a file in the repository and commit to trigger the pipeline
+  3) Edit a file in the repository and commit to trigger the pipeline (alternatively, create a pull-request)
 
   4) Check the pipeline run logs in Dev Console or Tekton CLI:
 
-    \$ tkn pipeline logs petclinic-build -L -f -n $cicd_prj
+    \$ opc pac logs -n $cicd_prj
 
 
   You can find further details at:
