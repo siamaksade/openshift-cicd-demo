@@ -16,8 +16,8 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Prerequisites
 
-* OpenShift GitOps 1.6
-* OpenShift Pipelines 1.8
+* OpenShift GitOps 1.7
+* OpenShift Pipelines 1.9
 * Pipelines as code nightly release
 
 The current version of this demo requires the unreleased version of pipelines-as-code which will be included in OpenShift Pipelines 1.9. In order to install the nightly release of pipelines-as-code, run the following command:
