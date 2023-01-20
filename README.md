@@ -71,8 +71,6 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 ![Gitea Pull Request](docs/images/gitea.png)
 
-![Promotion Pull-Request](docs/images/promote-pr.png)
-
 ![Pipeline Diagram](docs/images/pipelines-3.png)
 
 ![Pipeline Diagram](docs/images/pipelines-2.png)
@@ -80,6 +78,8 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 ![Pipeline Diagram](docs/images/pipelines-1.png)
 
 ![Argo CD](docs/images/argocd.png)
+
+![Promotion Pull-Request](docs/images/promote-pr.png)
 
 
 ## Troubleshooting
