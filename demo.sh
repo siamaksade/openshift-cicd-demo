@@ -118,11 +118,18 @@ command.install() {
 
   while oc get taskrun -n $cicd_prj | grep Running >/dev/null 2>/dev/null
   do
-    echo "waiting for Gogs init..."
+    echo "waiting for Gitea init..."
     sleep 5
   done
-
-  sleep 5
+  
+  while true; do
+    result=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1 | grep '200\ OK' | wc -l)
+    echo "Waiting for source code to copy to Gitea..."
+    if [ $result -eq 1 ]; then
+	    break
+    fi
+    sleep 5
+  done
 
   info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
