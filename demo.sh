@@ -122,7 +122,8 @@ command.install() {
     sleep 5
   done
   
-  while true; do
+  while true; 
+  do
     result=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1 | grep '200\ OK' | wc -l)
     echo "Waiting for source code to copy to Gitea..."
     if [ $result -eq 1 ]; then
