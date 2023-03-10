@@ -122,16 +122,14 @@ command.install() {
     sleep 5
   done
   
-  result=0
-  while [ $result -ne 1 ]; 
+  while true; 
   do
+    result=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1 | grep '200\ OK' | wc -l)
     echo "Waiting for source code to copy to Gitea..."
-    output=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1)
-    if echo "$output" | grep -q "200 OK"; then
-    	result=1
-    else
-    	sleep 5
+    if [ $result -eq 1 ]; then
+	    break
     fi
+    sleep 5
   done
 
   info "Updated pipelinerun values for the demo environment"
