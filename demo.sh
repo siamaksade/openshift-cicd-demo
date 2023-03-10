@@ -131,6 +131,8 @@ command.install() {
     fi
     sleep 5
   done
+  
+  sleep 5
 
   info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
