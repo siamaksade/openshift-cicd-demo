@@ -113,7 +113,6 @@ status:
   loadBalancer: {}
 ---
 apiVersion: route.openshift.io/v1
-id: gitea-http
 kind: Route
 metadata:
   annotations:
@@ -188,86 +187,6 @@ spec:
             path: app.ini
           name: gitea-config
         name: gitea-config
-# ---
-# apiVersion: apps.openshift.io/v1
-# kind: DeploymentConfig
-# metadata:
-#   labels:
-#     app: gitea
-#   name: gitea
-# spec:
-#   replicas: 1
-#   selector:
-#     app: gitea
-#     deploymentconfig: gitea
-#   strategy:
-#     resources: {}
-#     rollingParams:
-#       intervalSeconds: 1
-#       maxSurge: 25%
-#       maxUnavailable: 25%
-#       timeoutSeconds: 600
-#       updatePeriodSeconds: 1
-#     type: Rolling
-#   template:
-#     metadata:
-#       creationTimestamp: null
-#       labels:
-#         app: gitea
-#         deploymentconfig: gitea
-#     spec:
-#       containers:
-#       - image: quay.io/gpte-devops-automation/gitea:1.15.10
-#         imagePullPolicy: Always
-#         livenessProbe:
-#           failureThreshold: 3
-#           httpGet:
-#             path: /
-#             port: 3000
-#             scheme: HTTP
-#           initialDelaySeconds: 30
-#           periodSeconds: 10
-#           successThreshold: 1
-#           timeoutSeconds: 1
-#         name: gitea
-#         ports:
-#         - containerPort: 3000
-#           protocol: TCP
-#         readinessProbe:
-#           failureThreshold: 3
-#           httpGet:
-#             path: /
-#             port: 3000
-#             scheme: HTTP
-#           initialDelaySeconds: 5
-#           periodSeconds: 20
-#           successThreshold: 1
-#           timeoutSeconds: 1
-#         resources: {}
-#         terminationMessagePath: /dev/termination-log
-#         volumeMounts:
-#         - mountPath: /gitea-repositories
-#           name: gitea-repositories
-#         - mountPath: /home/gitea/conf
-#           name: gitea-config
-#       dnsPolicy: ClusterFirst
-#       restartPolicy: Always
-#       securityContext: {}
-#       serviceAccountName: gitea
-#       terminationGracePeriodSeconds: 30
-#       volumes:
-#       - name: gitea-repositories
-#         persistentVolumeClaim:
-#           claimName: gitea-repositories
-#       - configMap:
-#           items:
-#           - key: app.ini
-#             path: app.ini
-#           name: gitea-config
-#         name: gitea-config
-#   test: false
-#   triggers:
-#   - type: ConfigChange
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
