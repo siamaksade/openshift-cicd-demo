@@ -259,7 +259,7 @@ EOF
 }
 
 command.start() {
-  oc create -f runs/pipeline-build-run.yaml -n $cicd_prj
+  info "'start' command is not supported anymore. Create a commit or pull-request on the spring-petclinic.git git repo to start the pipeline"
 }
 
 command.uninstall() {
@@ -278,35 +278,3 @@ main() {
 }
 
 main
-
-
-
-
-# apiVersion: v1
-# kind: Secret
-# metadata:
-#   name: gitea-token
-# type: Opaque
-# stringData:
-#   token: "4ce5e96fcb814e9665fda53adf9ee12924105040"
-#   webhook: ""
-
-# apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
-# kind: Repository
-# metadata:
-#   name: spring-petclinic
-# spec:
-#   url: http://gitea-a2-cicd.apps.siamak.devcluster.openshift.com/gitea/spring-petclinic
-#   git_provider:
-#     user: "git"
-#     url: http://gitea-a2-cicd.apps.siamak.devcluster.openshift.com
-#     secret:
-#       name: gitea-token
-#       key: "token"
-#     webhook_secret:
-#       name: gitea-token
-#       key: "webhook"
-
-#           webhookURL = "http://" + os.popen('oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"').read()
-#           if webhookURL == "":
-#             webhookURL = "http://" + os.popen('oc get route pipelines-as-code-controller -n openshift-pipelines -o template --template="{{.spec.host}}"').read()
