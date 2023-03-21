@@ -270,7 +270,20 @@ EOF
 }
 
 command.start() {
-  info "'start' command is not supported anymore. Create a commit or pull-request on the spring-petclinic.git git repo to start the pipeline"
+  GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
+  info "Pushing a change to http://$GITEA_HOSTNAME/gitea/spring-petclinic-config"
+  tmp_dir=$(mktemp -d)
+  pushd $tmp_dir
+  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  cd spring-petclinic 
+  git config user.email "openshift-pipelines@redhat.com"
+  git config user.name "openshift-pipelines"
+  echo "   " >> readme.md
+  git add readme.md
+  git commit -m "Updated readme.md"
+  git remote add auth-origin http://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
+  git push auth-origin cicd-demo
+  popd
 }
 
 command.uninstall() {
