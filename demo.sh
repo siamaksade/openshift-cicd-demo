@@ -19,6 +19,16 @@ err() {
   exit 1
 }
 
+wait_seconds() {
+  local count=${1:-5}
+  for i in {1..$count}
+  do
+    echo "."
+    sleep 1
+  done
+  printf "\n"
+}
+
 case "$OSTYPE" in
     darwin*)  PLATFORM="OSX" ;;
     linux*)   PLATFORM="LINUX" ;;
@@ -114,25 +124,26 @@ command.install() {
   oc rollout status deployment/gitea -n $cicd_prj
   sed "s#@webhook-url@#https://$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | oc create -f - -n $cicd_prj
 
-  sleep 20
+
+  wait_seconds 20
 
   while oc get taskrun -n $cicd_prj | grep Running >/dev/null 2>/dev/null
   do
     echo "waiting for Gitea init..."
-    sleep 5
+    wait_seconds 5
   done
   
+  echo "Waiting for source code to be imported to Gitea..."
   while true; 
   do
-    result=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1 | grep '200\ OK' | wc -l)
-    echo "Waiting for source code to copy to Gitea..."
-    if [ $result -eq 1 ]; then
+    result=$(curl --write-out '%{response_code}' --head --silent --output /dev/null http://$GITEA_HOSTNAME/gitea/spring-petclinic)
+    if [ "$result" == "200" ]; then
 	    break
     fi
-    sleep 5
+    wait_seconds 5
   done
   
-  sleep 5
+  wait_seconds 5
 
   info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
@@ -186,7 +197,7 @@ stringData:
 EOF
   oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
 
-  sleep 10
+  wait_seconds 10
 
   info "Configure Argo CD"
 
@@ -218,7 +229,7 @@ EOF
 
   until oc get route argocd-server -n $cicd_prj >/dev/null 2>/dev/null
   do
-    sleep 3
+    wait_seconds 5
   done
 
   info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
@@ -259,7 +270,20 @@ EOF
 }
 
 command.start() {
-  info "'start' command is not supported anymore. Create a commit or pull-request on the spring-petclinic.git git repo to start the pipeline"
+  GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
+  info "Pushing a change to http://$GITEA_HOSTNAME/gitea/spring-petclinic-config"
+  tmp_dir=$(mktemp -d)
+  pushd $tmp_dir
+  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  cd spring-petclinic 
+  git config user.email "openshift-pipelines@redhat.com"
+  git config user.name "openshift-pipelines"
+  echo "   " >> readme.md
+  git add readme.md
+  git commit -m "Updated readme.md"
+  git remote add auth-origin http://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
+  git push auth-origin cicd-demo
+  popd
 }
 
 command.uninstall() {
