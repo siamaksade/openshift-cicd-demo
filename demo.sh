@@ -26,7 +26,7 @@ wait_seconds() {
     echo "."
     sleep 1
   done
-  echo "\n"
+  printf "\n"
 }
 
 case "$OSTYPE" in
@@ -133,11 +133,11 @@ command.install() {
     wait_seconds 5
   done
   
+  echo "Waiting for source code to be imported to Gitea..."
   while true; 
   do
-    result=$(wget --spider --server-response http://$GITEA_HOSTNAME/gitea/spring-petclinic 2>&1 | grep '200\ OK' | wc -l)
-    echo "Waiting for source code to copy to Gitea..."
-    if [ $result -eq 1 ]; then
+    result=$(curl --write-out '%{response_code}' --head --silent --output /dev/null http://$GITEA_HOSTNAME/gitea/spring-petclinic)
+    if [ "$result" == "200" ]; then
 	    break
     fi
     wait_seconds 5
