@@ -19,6 +19,16 @@ err() {
   exit 1
 }
 
+wait_seconds() {
+  local count=${1:-5}
+  for i in {1..$count}
+  do
+    echo "."
+    sleep 1
+  done
+  echo "\n"
+}
+
 case "$OSTYPE" in
     darwin*)  PLATFORM="OSX" ;;
     linux*)   PLATFORM="LINUX" ;;
@@ -114,12 +124,13 @@ command.install() {
   oc rollout status deployment/gitea -n $cicd_prj
   sed "s#@webhook-url@#https://$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | oc create -f - -n $cicd_prj
 
-  sleep 20
+
+  wait_seconds 20
 
   while oc get taskrun -n $cicd_prj | grep Running >/dev/null 2>/dev/null
   do
     echo "waiting for Gitea init..."
-    sleep 5
+    wait_seconds 5
   done
   
   while true; 
@@ -129,10 +140,10 @@ command.install() {
     if [ $result -eq 1 ]; then
 	    break
     fi
-    sleep 5
+    wait_seconds 5
   done
   
-  sleep 5
+  wait_seconds 5
 
   info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
@@ -186,7 +197,7 @@ stringData:
 EOF
   oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
 
-  sleep 10
+  wait_seconds 10
 
   info "Configure Argo CD"
 
@@ -218,7 +229,7 @@ EOF
 
   until oc get route argocd-server -n $cicd_prj >/dev/null 2>/dev/null
   do
-    sleep 3
+    wait_seconds 5
   done
 
   info "Grants permissions to ArgoCD instances to manage resources in target namespaces"
