@@ -74,3 +74,7 @@ data:
     FILE_EXTENSIONS = .adoc,.asciidoc
     RENDER_COMMAND = "asciidoc --out-file=- -"
     IS_INPUT_FILE = false
+
+    [webhook]
+    ; Allow insecure certification
+    SKIP_TLS_VERIFY = true
