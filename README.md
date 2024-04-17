@@ -15,8 +15,8 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Prerequisites
 
-* OpenShift GitOps 1.8
-* OpenShift Pipelines 1.10
+* OpenShift GitOps 1.8+
+* OpenShift Pipelines 1.10+
 
 ## Continuous Integration
 
