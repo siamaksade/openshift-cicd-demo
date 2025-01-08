@@ -29,7 +29,7 @@ data:
     ROOT = /gitea-repositories
 
     [server]
-    ROOT_URL         = http://@HOSTNAME
+    ROOT_URL         = https://@HOSTNAME
     SSH_DOMAIN       = @HOSTNAME
     DOMAIN           = @HOSTNAME
     HTTP_PORT        = 3000

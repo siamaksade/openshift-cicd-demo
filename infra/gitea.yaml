@@ -123,6 +123,9 @@ metadata:
 spec:
   to:
     name: gitea
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: None
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -149,7 +152,7 @@ spec:
       containers:
       - name: gitea
         imagePullPolicy: Always
-        image: quay.io/gpte-devops-automation/gitea:1.17.2
+        image: quay.io/gpte-devops-automation/gitea:1.20
         ports:
         - containerPort: 3000
           protocol: TCP
