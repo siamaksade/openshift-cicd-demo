@@ -7,6 +7,7 @@ data:
     APP_NAME = Gitea: Git with a cup of tea
     RUN_USER = gitea
     RUN_MODE = prod
+    WORK_PATH = /home/gitea
 
     [security]
     INTERNAL_TOKEN = glXtv83JUc4NQ0RowkSlVnLlVD5lJGE4DC3uFckvJhCuJnNXEpIYLriYnCfXK8FaDELLYtRAsiiOFjlSIK2kLUl7QE8Et31O8WHD6Ld4f

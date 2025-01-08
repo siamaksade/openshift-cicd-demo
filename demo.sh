@@ -136,7 +136,7 @@ command.install() {
   echo "Waiting for source code to be imported to Gitea..."
   while true; 
   do
-    result=$(curl --write-out '%{response_code}' --head --silent --output /dev/null http://$GITEA_HOSTNAME/gitea/spring-petclinic)
+    result=$(curl --write-out '%{response_code}' --head --silent --output /dev/null https://$GITEA_HOSTNAME/gitea/spring-petclinic)
     if [ "$result" == "200" ]; then
 	    break
     fi
@@ -148,17 +148,17 @@ command.install() {
   info "Updated pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
   pushd $tmp_dir
-  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  git clone https://$GITEA_HOSTNAME/gitea/spring-petclinic 
   cd spring-petclinic 
   git config user.email "openshift-pipelines@redhat.com"
   git config user.name "openshift-pipelines"
   cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
-  cross_sed "s#https://github.com/siamaksade/spring-petclinic-config#http://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+  cross_sed "s#https://github.com/siamaksade/spring-petclinic-config#https://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
   cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
   git status
   git add .tekton/build.yaml
   git commit -m "Updated manifests git url"
-  git remote add auth-origin http://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
+  git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
   git push auth-origin cicd-demo
   popd
 
@@ -174,10 +174,10 @@ metadata:
   name: spring-petclinic
   namespace: $cicd_prj
 spec:
-  url: http://$GITEA_HOSTNAME/gitea/spring-petclinic
+  url: https://$GITEA_HOSTNAME/gitea/spring-petclinic
   git_provider:
     user: "git"
-    url: http://$GITEA_HOSTNAME
+    url: https://$GITEA_HOSTNAME
     secret:
       name: "gitea"
       key: token
@@ -211,7 +211,7 @@ spec:
   destination:
     namespace: $dev_prj
   source:
-    repoURL: http://$GITEA_HOSTNAME/gitea/spring-petclinic-config
+    repoURL: https://$GITEA_HOSTNAME/gitea/spring-petclinic-config
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -221,7 +221,7 @@ spec:
   destination:
     namespace: $stage_prj
   source:
-    repoURL: http://$GITEA_HOSTNAME/gitea/spring-petclinic-config
+    repoURL: https://$GITEA_HOSTNAME/gitea/spring-petclinic-config
 EOF
   oc apply -k argo -n $cicd_prj
 
@@ -246,7 +246,7 @@ EOF
   Demo is installed! Give it a few minutes to finish deployments and then:
 
   1) Go to spring-petclinic Git repository in Gitea:
-     http://$GITEA_HOSTNAME/gitea/spring-petclinic.git
+     https://$GITEA_HOSTNAME/gitea/spring-petclinic.git
 
   2) Log into Gitea with username/password: gitea/openshift
 
@@ -259,7 +259,7 @@ EOF
 
   You can find further details at:
 
-  Gitea Git Server: http://$GITEA_HOSTNAME/explore/repos
+  Gitea Git Server: https://$GITEA_HOSTNAME/explore/repos
   SonarQube: https://$(oc get route sonarqube -o template --template='{{.spec.host}}' -n $cicd_prj)
   Sonatype Nexus: http://$(oc get route nexus -o template --template='{{.spec.host}}' -n $cicd_prj)
   Argo CD:  http://$(oc get route argocd-server -o template --template='{{.spec.host}}' -n $cicd_prj)  [login with OpenShift credentials]
@@ -271,17 +271,17 @@ EOF
 
 command.start() {
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
-  info "Pushing a change to http://$GITEA_HOSTNAME/gitea/spring-petclinic-config"
+  info "Pushing a change to https://$GITEA_HOSTNAME/gitea/spring-petclinic-config"
   tmp_dir=$(mktemp -d)
   pushd $tmp_dir
-  git clone http://$GITEA_HOSTNAME/gitea/spring-petclinic 
+  git clone https://$GITEA_HOSTNAME/gitea/spring-petclinic 
   cd spring-petclinic 
   git config user.email "openshift-pipelines@redhat.com"
   git config user.name "openshift-pipelines"
   echo "   " >> readme.md
   git add readme.md
   git commit -m "Updated readme.md"
-  git remote add auth-origin http://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
+  git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
   git push auth-origin cicd-demo
   popd
 }
