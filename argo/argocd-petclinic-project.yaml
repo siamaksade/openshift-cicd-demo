@@ -4,10 +4,10 @@ metadata:
   name: spring-petclinic
 spec:
   sourceRepos:
-  - '*'
+    - "*"
   destinations:
-  - namespace: '*'
-    server: '*'
+    - namespace: "*"
+      server: "*"
   clusterResourceWhitelist:
-  - group: '*'
-    kind: '*'
+    - group: "*"
+      kind: "*"

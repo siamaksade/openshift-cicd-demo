@@ -164,10 +164,9 @@ spec:
         app.kubernetes.io/instance: sonarqube
         role: primary
         app.kubernetes.io/component: primary
-    spec:      
+    spec:
       affinity:
         podAffinity:
-          
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - podAffinityTerm:
@@ -179,11 +178,10 @@ spec:
                 topologyKey: kubernetes.io/hostname
               weight: 1
         nodeAffinity:
-          
       automountServiceAccountToken: false
       containers:
         - name: sonarqube-postgresql
-          image: docker.io/bitnami/postgresql:11.14.0-debian-10-r22
+          image: docker.io/bitnamilegacy/postgresql:11.14.0
           imagePullPolicy: "IfNotPresent"
           resources:
             limits:
@@ -264,7 +262,7 @@ spec:
               mountPath: /dev/shm
             - name: data
               mountPath: /bitnami/postgresql
-              subPath: 
+              subPath:
       volumes:
         - name: dshm
           emptyDir:
@@ -324,8 +322,7 @@ spec:
         release: sonarqube
     spec:
       automountServiceAccountToken: false
-      securityContext:
-        {}
+      securityContext: {}
       initContainers:
         - name: "wait-for-db"
           image: sonarqube:24.12.0.100206-community
@@ -334,13 +331,16 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
-              - ALL
+                - ALL
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
           command: ["/bin/bash", "-c"]
-          args: ['set -o pipefail;for i in {1..200};do (echo > /dev/tcp/sonarqube-postgresql/5432) && exit 0; sleep 2;done; exit 1']
+          args:
+            [
+              "set -o pipefail;for i in {1..200};do (echo > /dev/tcp/sonarqube-postgresql/5432) && exit 0; sleep 2;done; exit 1",
+            ]
       containers:
         - name: sonarqube
           image: sonarqube:24.12.0.100206-community
@@ -351,9 +351,9 @@ spec:
               protocol: TCP
           resources:
             limits:
-              cpu: 800m
-              ephemeral-storage: 5Gi
-              memory: 3Gi
+              cpu: "4"
+              ephemeral-storage: 10Gi
+              memory: 8Gi
             requests:
               cpu: 400m
               ephemeral-storage: 1Gi
@@ -385,10 +385,10 @@ spec:
           livenessProbe:
             exec:
               command:
-              - sh
-              - -c
-              - |
-                wget --no-proxy --quiet -O /dev/null --timeout=1 --header="X-Sonar-Passcode: $SONAR_WEB_SYSTEMPASSCODE" "http://localhost:9000/api/system/liveness"
+                - sh
+                - -c
+                - |
+                  wget --no-proxy --quiet -O /dev/null --timeout=1 --header="X-Sonar-Passcode: $SONAR_WEB_SYSTEMPASSCODE" "http://localhost:9000/api/system/liveness"
             failureThreshold: 6
             initialDelaySeconds: 60
             periodSeconds: 30
@@ -396,16 +396,16 @@ spec:
           readinessProbe:
             exec:
               command:
-              - sh
-              - -c
-              - |
-                #!/bin/bash
-                # A Sonarqube container is considered ready if the status is UP, DB_MIGRATION_NEEDED or DB_MIGRATION_RUNNING
-                # status about migration are added to prevent the node to be kill while SonarQube is upgrading the database.
-                if wget --no-proxy -qO- http://localhost:9000/api/system/status | grep -q -e '"status":"UP"' -e '"status":"DB_MIGRATION_NEEDED"' -e '"status":"DB_MIGRATION_RUNNING"'; then
-                  exit 0
-                fi
-                exit 1
+                - sh
+                - -c
+                - |
+                  #!/bin/bash
+                  # A Sonarqube container is considered ready if the status is UP, DB_MIGRATION_NEEDED or DB_MIGRATION_RUNNING
+                  # status about migration are added to prevent the node to be kill while SonarQube is upgrading the database.
+                  if wget --no-proxy -qO- http://localhost:9000/api/system/status | grep -q -e '"status":"UP"' -e '"status":"DB_MIGRATION_NEEDED"' -e '"status":"DB_MIGRATION_RUNNING"'; then
+                    exit 0
+                  fi
+                  exit 1
             failureThreshold: 6
             initialDelaySeconds: 60
             periodSeconds: 30
@@ -423,7 +423,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
-              - ALL
+                - ALL
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
@@ -444,13 +444,10 @@ spec:
               subPath: extensions
       serviceAccountName: default
       volumes:
-        
         - name: sonarqube
-          emptyDir:
-            {}
-        - name : tmp-dir
-          emptyDir:
-            {}
+          emptyDir: {}
+        - name: tmp-dir
+          emptyDir: {}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -476,30 +473,25 @@ spec:
       restartPolicy: OnFailure
       serviceAccountName: default
       containers:
-      - name: sonarqube-change-default-admin-password
-        image: sonarqube:24.12.0.100206-community
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
-        command: ["sh", "-c", 'until curl -v --connect-timeout 100 sonarqube:9000/api/system/status | grep -w UP; do sleep 10; done; curl -v --connect-timeout 100 -X POST -u admin:$CURRENT_ADMIN_PASSWORD "sonarqube:9000/api/settings/set?key=sonar.forceAuthentication&value=false"; sleep 5; curl -v --connect-timeout 100 -u admin:$CURRENT_ADMIN_PASSWORD -X POST "sonarqube:9000/api/users/change_password?login=admin&previousPassword=$CURRENT_ADMIN_PASSWORD&password=$ADMIN_PASSWORD"; ']
-        env:
-        - name: ADMIN_PASSWORD
-          value: "sonarqube"
-        - name: CURRENT_ADMIN_PASSWORD
-          value: "admin"
-        resources:
-          limits:
-            cpu: 800m
-            ephemeral-storage: 512000M
-            memory: 6144M
-          requests:
-            cpu: 400m
-            ephemeral-storage: 1536M
-            memory: 2048M
----
+        - name: sonarqube-change-default-admin-password
+          image: sonarqube:24.12.0.100206-community
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            [
+              "sh",
+              "-c",
+              'until curl -v --connect-timeout 100 sonarqube:9000/api/system/status | grep -w UP; do sleep 10; done; curl -v --connect-timeout 100 -X POST -u admin:$CURRENT_ADMIN_PASSWORD "sonarqube:9000/api/settings/set?key=sonar.forceAuthentication&value=false"; sleep 5; curl -v --connect-timeout 100 -u admin:$CURRENT_ADMIN_PASSWORD -X POST "sonarqube:9000/api/users/change_password?login=admin&previousPassword=$CURRENT_ADMIN_PASSWORD&password=$ADMIN_PASSWORD"; ',
+            ]
+          env:
+            - name: ADMIN_PASSWORD
+              value: "sonarqube"
+            - name: CURRENT_ADMIN_PASSWORD
+              value: "admin"

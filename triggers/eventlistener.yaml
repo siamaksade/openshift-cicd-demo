@@ -12,12 +12,12 @@ spec:
           ref:
             name: "cel"
           params:
-          - name: "overlays"
-            value:
-            - key: short_sha
-              expression: "body.after.truncate(7)"
-            - key: branch_name
-              expression: "body.ref.split('/')[2]"
+            - name: "overlays"
+              value:
+                - key: short_sha
+                  expression: "body.after.truncate(7)"
+                - key: branch_name
+                  expression: "body.ref.split('/')[2]"
       bindings:
         - ref: gogs-triggerbinding
       template:

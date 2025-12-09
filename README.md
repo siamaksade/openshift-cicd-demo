@@ -1,3 +1,39 @@
+# About this fork
+
+This work is a fork of https://github.com/siamaksade/openshift-cicd-demo for the use case of on-premises virtualized OpenShift environments for demo purposes, where you wouldn't have a paid certificate or instead you are relying on the default Ingress CA. Perhaps you installed OpenShift on an SNO environment or even you're using OpenShift Local (AKA CRC) for your demo.
+
+If using the demo on Codeready Containers (OpenShift Local) on Windows 11, set your WSL2 to use mirror network mode so that the ingress controller can be reached from the host. This is done by creating the following in the WSL2 config file `$HOME/.wslconfig`.
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+The only pre-requisite in this regard is that you obtain your ingress default CA (or your custom CA) and then add that CA to the proxy/cluster object in OpenShift before installing this demo, besides other pre-requisites that are documented in this README file.
+
+This is the procedure you can follow on RHEL or RHEL derivatives. This was tested on RHEL 9.
+
+```shell
+oc get secret/router-ca -n openshift-ingress-operator -o jsonpath='{.data.tls\.crt}' |base64 -d > ingress-ca.crt
+# For Fedora:
+sudo cp ingress-ca.crt /etc/pki/ca-trust/source/anchors
+sudo update-ca-trust
+
+# For Ubuntu:
+sudo cp ingress-ca.crt /usr/local/share/ca-certificates
+sudo update-ca-certificates
+
+oc create configmap custom-ca --from-file ca-bundle.crt=./ingress-ca.crt -n openshift-config
+oc patch proxy/cluster --type=merge -p '{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+
+# wait for the pods to be restarted
+
+watch oc get pods -n openshift-apiserver
+```
+
+Also import the CA to your local machine, so you can access the OpenShift console and the Gitea instance without certificate errors.
+
+
 # CI/CD Demo with Tekton and Argo CD on OpenShift
 
 This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for continuous integration and [Argo CD](https://argoproj.github.io/argo-cd/) for continuous delivery on OpenShift which builds and deploys the [Spring PetClinic](https://github.com/spring-projects/spring-petclinic) sample Spring Boot application. This demo creates:
@@ -15,8 +51,8 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Tested Configuration
 
-* OpenShift GitOps 1.15
-* OpenShift Pipelines 1.17
+* OpenShift GitOps 1.16
+* OpenShift Pipelines 1.18
 
 ## Continuous Integration
 

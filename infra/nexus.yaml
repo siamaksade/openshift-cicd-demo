@@ -19,50 +19,50 @@ spec:
         app: nexus
     spec:
       containers:
-      - name: nexus
-        image: quay.io/siamaksade/nexus3:3.16.2
-        env:
-        - name: CONTEXT_PATH
-          value: /
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8081
-          protocol: TCP
-        livenessProbe:
-          exec:
-            command:
-            - echo
-            - ok
-          failureThreshold: 3
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /
-            port: 8081
-            scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-        resources:
-          limits:
-            memory: 4Gi
-            cpu: 2
-          requests:
-            memory: 512Mi
-            cpu: 200m
-        terminationMessagePath: /dev/termination-log
-        volumeMounts:
-        - mountPath: /nexus-data
-          name: nexus-data
+        - name: nexus
+          image: quay.io/siamaksade/nexus3:3.16.2
+          env:
+            - name: CONTEXT_PATH
+              value: /
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            exec:
+              command:
+                - echo
+                - ok
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 4Gi
+              cpu: 2
+            requests:
+              memory: 512Mi
+              cpu: 200m
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+            - mountPath: /nexus-data
+              name: nexus-data
       volumes:
-      - name: nexus-data
-        persistentVolumeClaim:
-          claimName: nexus-pv
+        - name: nexus-data
+          persistentVolumeClaim:
+            claimName: nexus-pv
 ---
 apiVersion: v1
 kind: Service
@@ -72,10 +72,10 @@ metadata:
   name: nexus
 spec:
   ports:
-  - name: 8081-tcp
-    port: 8081
-    protocol: TCP
-    targetPort: 8081
+    - name: 8081-tcp
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
   selector:
     app: nexus
   sessionAffinity: None
@@ -106,7 +106,7 @@ metadata:
   name: nexus-pv
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi

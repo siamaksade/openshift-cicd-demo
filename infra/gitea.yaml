@@ -14,9 +14,9 @@ metadata:
   name: gitea-postgresql
 spec:
   ports:
-  - name: postgresql
-    port: 5432
-    targetPort: 5432
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
   selector:
     name: gitea-postgresql
 ---
@@ -26,7 +26,7 @@ metadata:
   name: gitea-postgresql
   annotations:
     image.openshift.io/triggers: >-
-        [{"from":{"kind":"ImageStreamTag","name":"postgresql:12", "namespace":"openshift"},"fieldPath":"spec.template.spec.containers[?(@.name==\"postgresql\")].image"}]
+      [{"from":{"kind":"ImageStreamTag","name":"postgresql:12", "namespace":"openshift"},"fieldPath":"spec.template.spec.containers[?(@.name==\"postgresql\")].image"}]
   labels:
     app: gitea
     app.kubernetes.io/component: database
@@ -46,48 +46,48 @@ spec:
         name: gitea-postgresql
     spec:
       containers:
-      - name: postgresql
-        imagePullPolicy: Always
-        image: postgresql:12
-        env:
-        - name: POSTGRESQL_USER
-          value: gitea
-        - name: POSTGRESQL_PASSWORD
-          value: gitea
-        - name: POSTGRESQL_DATABASE
-          value: gitea
-        - name: POSTGRESQL_MAX_CONNECTIONS
-          value: "100"
-        - name: POSTGRESQL_SHARED_BUFFERS
-          value: 12MB
-        - name: POSTGRESQL_ADMIN_PASSWORD
-          value: gitea
-        ports:
-        - containerPort: 5432
-        livenessProbe:
-          initialDelaySeconds: 30
-          tcpSocket:
-            port: 5432
-          timeoutSeconds: 1
-          failureThreshold: 10
-          periodSeconds: 20
-        readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -i
-            - -c
-            - psql -h 127.0.0.1 -U ${POSTGRESQL_USER} -q -d ${POSTGRESQL_DATABASE} -c 'SELECT 1'
-        resources:
-          limits:
-            memory: 512Mi
-        volumeMounts:
-        - mountPath: /var/lib/pgsql/data
-          name: gitea-postgres-data
+        - name: postgresql
+          imagePullPolicy: Always
+          image: postgresql:12
+          env:
+            - name: POSTGRESQL_USER
+              value: gitea
+            - name: POSTGRESQL_PASSWORD
+              value: gitea
+            - name: POSTGRESQL_DATABASE
+              value: gitea
+            - name: POSTGRESQL_MAX_CONNECTIONS
+              value: "100"
+            - name: POSTGRESQL_SHARED_BUFFERS
+              value: 12MB
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              value: gitea
+          ports:
+            - containerPort: 5432
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 5432
+            timeoutSeconds: 1
+            failureThreshold: 10
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -i
+                - -c
+                - psql -h 127.0.0.1 -U ${POSTGRESQL_USER} -q -d ${POSTGRESQL_DATABASE} -c 'SELECT 1'
+          resources:
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /var/lib/pgsql/data
+              name: gitea-postgres-data
       volumes:
-      - name: gitea-postgres-data
-        persistentVolumeClaim:
-          claimName: gitea-postgres-data
+        - name: gitea-postgres-data
+          persistentVolumeClaim:
+            claimName: gitea-postgres-data
 ---
 apiVersion: v1
 kind: Service
@@ -100,10 +100,10 @@ metadata:
   name: gitea
 spec:
   ports:
-  - name: 3000-tcp
-    port: 3000
-    protocol: TCP
-    targetPort: 3000
+    - name: 3000-tcp
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
   selector:
     app: gitea
     name: gitea
@@ -150,18 +150,18 @@ spec:
         name: gitea
     spec:
       containers:
-      - name: gitea
-        imagePullPolicy: Always
-        image: quay.io/gpte-devops-automation/gitea:1.20
-        ports:
-        - containerPort: 3000
-          protocol: TCP
-        volumeMounts:
-        - mountPath: /gitea-repositories
-          name: gitea-repositories
-        - mountPath: /home/gitea/conf
-          name: gitea-config
-        readinessProbe:
+        - name: gitea
+          imagePullPolicy: Always
+          image: quay.io/gpte-devops-automation/gitea:1.20
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /gitea-repositories
+              name: gitea-repositories
+            - mountPath: /home/gitea/conf
+              name: gitea-config
+          readinessProbe:
             httpGet:
               path: /
               port: 3000
@@ -170,7 +170,7 @@ spec:
             periodSeconds: 20
             successThreshold: 1
             timeoutSeconds: 1
-        livenessProbe:
+          livenessProbe:
             httpGet:
               path: /
               port: 3000
@@ -181,15 +181,15 @@ spec:
             timeoutSeconds: 1
       serviceAccountName: gitea
       volumes:
-      - name: gitea-repositories
-        persistentVolumeClaim:
-          claimName: gitea-repositories
-      - configMap:
-          items:
-          - key: app.ini
-            path: app.ini
+        - name: gitea-repositories
+          persistentVolumeClaim:
+            claimName: gitea-repositories
+        - configMap:
+            items:
+              - key: app.ini
+                path: app.ini
+            name: gitea-config
           name: gitea-config
-        name: gitea-config
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -197,7 +197,7 @@ metadata:
   name: gitea-repositories
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
@@ -208,7 +208,7 @@ metadata:
   name: gitea-postgres-data
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi

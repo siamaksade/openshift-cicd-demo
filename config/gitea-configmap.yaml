@@ -1,4 +1,12 @@
 apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+  name: ca-bundle
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: gitea-config
@@ -79,3 +87,4 @@ data:
     [webhook]
     ; Allow insecure certification
     SKIP_TLS_VERIFY = true
+    ALLOWED_HOST_LIST = '*'

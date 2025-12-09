@@ -4,6 +4,13 @@ metadata:
   generateName: init-gitea-
 spec:
   taskSpec:
+    volumes:
+      - name: ca-bundle
+        configMap:
+          name: ca-bundle
+          items:
+            - key: ca-bundle.crt
+              path: tls-ca-bundle.pem
     params:
     - name: GITEA_USER
       type: string
@@ -27,93 +34,230 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
     steps:
       - name: init-gitea
         image: quay.io/siamaksade/python-oc
+        volumeMounts:
+          - name: ca-bundle
+            mountPath: /etc/pki/ca-trust/extracted/pem
+            readOnly: true
         script: |
           #!/usr/bin/env python3
 
           import requests
           import os
+          import subprocess
+          import json
 
           gitea_user = "$(params.GITEA_USER)"
           gitea_pwd = "$(params.GITEA_PASSWORD)"
           giteaURL = "$(params.GITEA_URL)"
           webhookURL = "$(params.WEBHOOK_URL)"
 
-          # create admin user
-          data_user = {
-          'user_name': gitea_user,
-          'password': gitea_pwd,
-          'retype': gitea_pwd,
-          'email': 'admin@gitea.com'
-          }
+          # Verificar si el usuario admin ya existe
+          try:
+            resp = requests.get(url = giteaURL + "/api/v1/users/" + gitea_user, auth = (gitea_user, gitea_pwd))
+            if resp.status_code == 200:
+              print("Admin user {} already exists".format(gitea_user))
+            else:
+              # create admin user
+              data_user = {
+              'user_name': gitea_user,
+              'password': gitea_pwd,
+              'retype': gitea_pwd,
+              'email': 'admin@gitea.com'
+              }
+              resp = requests.post(url = giteaURL + "/user/sign_up", data = data_user)
+              if resp.status_code != 200:
+                print("Error creating admin user (status code: {})".format(resp.status_code))
+                print(resp.content)
+              else:
+                print("Created admin user {}:{}".format(gitea_user, gitea_pwd))
+          except Exception as e:
+            print("Error checking/creating admin user: {}".format(e))
+            # Intentar crear el usuario si no se pudo verificar
+            data_user = {
+            'user_name': gitea_user,
+            'password': gitea_pwd,
+            'retype': gitea_pwd,
+            'email': 'admin@gitea.com'
+            }
+            resp = requests.post(url = giteaURL + "/user/sign_up", data = data_user)
+            if resp.status_code == 200:
+              print("Created admin user {}:{}".format(gitea_user, gitea_pwd))
 
-          resp = requests.post(url = giteaURL + "/user/sign_up", data = data_user) 
+          # Verificar si el repositorio spring-petclinic ya existe
+          try:
+            resp = requests.get(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic", auth = (gitea_user, gitea_pwd))
+            if resp.status_code == 200:
+              repo_data = resp.json()
+              print("Repository spring-petclinic already exists")
+              # Verificar y actualizar default branch si es necesario
+              if repo_data.get("default_branch") != "cicd-demo":
+                data_branch = '{"default_branch": "cicd-demo"}'
+                headers = {'Content-Type': 'application/json'}
+                resp = requests.patch(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic",
+                                    headers = headers,
+                                    auth = (gitea_user, gitea_pwd),
+                                    data = data_branch)
+                if resp.status_code in [200, 201]:
+                  print("Updated default branch to 'cicd-demo'")
+            else:
+              # create git repo spring-petclinic
+              data_repo = '{"clone_addr": "https://github.com/cellosofia/spring-petclinic-pac", "uid": 1, "repo_name": "spring-petclinic"}'
+              headers = {'Content-Type': 'application/json'}
+              resp = requests.post(url = giteaURL + "/api/v1/repos/migrate", headers = headers, auth = (gitea_user, gitea_pwd), data = data_repo)
+              if resp.status_code not in [200, 201]:
+                print("Error creating git repo (status code: {})".format(resp.status_code))
+                print(resp.content)
+              else:
+                print("Created git repo spring-petclinic")
+                # set default branch on spring-petclinic git repo
+                data_branch = '{"default_branch": "cicd-demo"}'
+                headers = {'Content-Type': 'application/json'}
+                resp = requests.patch(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic",
+                                    headers = headers,
+                                    auth = (gitea_user, gitea_pwd),
+                                    data = data_branch)
+                if resp.status_code in [200, 201]:
+                  print("Set default branch to 'cicd-demo'")
+          except Exception as e:
+            print("Error checking/creating spring-petclinic repo: {}".format(e))
 
-          if resp.status_code != 200:
-            print("Error creating Gogs admin (status code: {})".format(resp.status_code))
-            print(resp.content)
+          # Verificar si el webhook ya existe y está configurado correctamente
+          try:
+            resp = requests.get(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic/hooks", auth = (gitea_user, gitea_pwd))
+            webhook_exists = False
+            if resp.status_code == 200:
+              hooks = resp.json()
+              for hook in hooks:
+                if hook.get("config", {}).get("url") == webhookURL:
+                  webhook_exists = True
+                  print("Webhook already configured: " + webhookURL)
+                  # Verificar que esté activo
+                  if not hook.get("active", False):
+                    # Activar el webhook
+                    hook_id = hook.get("id")
+                    data_webhook = '{"active": true}'
+                    headers = {'Content-Type': 'application/json'}
+                    resp = requests.patch(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic/hooks/" + str(hook_id),
+                                        headers = headers,
+                                        auth = (gitea_user, gitea_pwd),
+                                        data = data_webhook)
+                    if resp.status_code in [200, 201]:
+                      print("Activated existing webhook")
+                  break
+            
+            if not webhook_exists:
+              # configure webhook on spring-petclinic
+              data_webhook = '{"type": "gitea", "config": { "url": "' + webhookURL + '", "content_type": "json"}, "events": ["push", "pull_request", "issue_comment"], "active": true}'
+              headers = {'Content-Type': 'application/json'}
+              resp = requests.post(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic/hooks",
+                                  headers = headers,
+                                  auth = (gitea_user, gitea_pwd),
+                                  data = data_webhook)
+              if resp.status_code not in [200, 201]:
+                print("Error configuring the webhook (status code: {})".format(resp.status_code))
+                print(resp.content)
+              else:
+                print("Configured webhook: " + webhookURL)
+          except Exception as e:
+            print("Error checking/creating webhook: {}".format(e))
+
+          # Verificar si el repositorio spring-petclinic-config ya existe
+          try:
+            resp = requests.get(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic-config", auth = (gitea_user, gitea_pwd))
+            if resp.status_code == 200:
+              print("Repository spring-petclinic-config already exists")
+            else:
+              # create git repo spring-petclinic-config
+              data_repo = '{"clone_addr": "https://github.com/siamaksade/spring-petclinic-config.git", "uid": 1, "repo_name": "spring-petclinic-config"}'
+              headers = {'Content-Type': 'application/json'}
+              resp = requests.post(url = giteaURL + "/api/v1/repos/migrate", headers = headers, auth = (gitea_user, gitea_pwd), data = data_repo)
+              if resp.status_code not in [200, 201]:
+                print("Error creating git repo (status code: {})".format(resp.status_code))
+                print(resp.content)
+              else:
+                print("Created git repo spring-petclinic-config")
+          except Exception as e:
+            print("Error checking/creating spring-petclinic-config repo: {}".format(e))
+
+          # Verificar si el token ya existe, si no crearlo
+          gitea_token = None
+          try:
+            resp = requests.get(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens", auth = (gitea_user, gitea_pwd))
+            if resp.status_code == 200:
+              tokens = resp.json()
+              for token in tokens:
+                if token.get("name") == "cicd":
+                  # El token existe, pero necesitamos obtener el valor
+                  # Los tokens existentes no devuelven el valor por seguridad, así que creamos uno nuevo
+                  print("Token 'cicd' already exists, creating new one to ensure secret is updated")
+                  # Eliminar el token viejo
+                  token_id = token.get("id")
+                  if token_id:
+                    requests.delete(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens/" + str(token_id), auth = (gitea_user, gitea_pwd))
+          except Exception as e:
+            print("Error checking existing tokens: {}".format(e))
+
+          # Crear token (nuevo o reemplazo)
+          try:
+            data_token = '{"name": "cicd", "scopes": ["write:admin", "write:issue", "write:misc", "write:notification", "write:repository"]}'
+            headers = {'Content-Type': 'application/json'}
+            resp = requests.post(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens", headers = headers, auth = (gitea_user, gitea_pwd), data = data_token)
+            resp.raise_for_status()
+            gitea_token = resp.json()["sha1"]
+            print("## Token: " + gitea_token + " ##")
+          except Exception as e:
+            print("Error creating token: {}".format(e))
+            # Intentar obtener el token del secret existente si falla la creación
+            try:
+              result = subprocess.run(['oc', 'get', 'secret', 'gitea', '-o', 'jsonpath={.data.token}'], 
+                                    capture_output=True, text=True, check=False)
+              if result.returncode == 0 and result.stdout:
+                import base64
+                gitea_token = base64.b64decode(result.stdout).decode('utf-8')
+                print("Using existing token from secret")
+            except:
+              pass
+
+          # Crear o actualizar el secret con el token
+          if gitea_token:
+            try:
+              # Verificar si el secret ya existe
+              result = subprocess.run(['oc', 'get', 'secret', 'gitea'], capture_output=True, check=False)
+              if result.returncode == 0:
+                # El secret existe, actualizarlo usando oc create con --dry-run y oc apply
+                create_cmd = ['oc', 'create', 'secret', 'generic', 'gitea', 
+                             '--from-literal=token=' + gitea_token, 
+                             '--from-literal=webhook=""', '--dry-run=client', '-o', 'yaml']
+                create_result = subprocess.run(create_cmd, capture_output=True, text=True, check=False)
+                if create_result.returncode == 0:
+                  apply_result = subprocess.run(['oc', 'apply', '-f', '-'], 
+                                              input=create_result.stdout, 
+                                              text=True, check=False)
+                  if apply_result.returncode == 0:
+                    print("Updated secret gitea with token")
+                  else:
+                    raise Exception("Failed to apply secret update")
+                else:
+                  raise Exception("Failed to generate secret YAML")
+              else:
+                # El secret no existe, crearlo
+                subprocess.run(['oc', 'create', 'secret', 'generic', 'gitea', 
+                              '--from-literal=token=' + gitea_token, 
+                              '--from-literal=webhook=""'], check=False)
+                print("Created secret gitea with token")
+            except Exception as e:
+              print("Error creating/updating secret: {}".format(e))
+              # Fallback al método original
+              try:
+                subprocess.run(['oc', 'create', 'secret', 'generic', 'gitea', 
+                              '--from-literal=token=' + gitea_token, 
+                              '--from-literal=webhook=""'], check=False)
+              except:
+                os.popen('oc create secret generic gitea --from-literal=token=' + gitea_token + ' --from-literal=webhook=""')
           else:
-            print("Created admin user {}:{}".format(gitea_user, gitea_pwd))
-
-          # create git repo spring-petclinic
-          data_repo = '{"clone_addr": "https://github.com/siamaksade/spring-petclinic-pac", "uid": 1, "repo_name": "spring-petclinic"}'
-          headers = {'Content-Type': 'application/json'}
-          resp = requests.post(url = giteaURL + "/api/v1/repos/migrate", headers = headers, auth = (gitea_user, gitea_pwd), data = data_repo)  
-
-          if resp.status_code != 200 and resp.status_code != 201:
-            print("Error creating git repo (status code: {})".format(resp.status_code))
-            print(resp.content)
-          else:
-            print("Created git repo spring-petclinic")
-
-          # set default branch on spring-petclinic git repo 
-          data_branch = '{"default_branch": "cicd-demo"}'
-          headers = {'Content-Type': 'application/json'}
-          resp = requests.patch(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic", 
-                              headers = headers, 
-                              auth = (gitea_user, gitea_pwd), 
-                              data = data_branch) 
-
-          if resp.status_code != 200 and resp.status_code != 201:
-            print("Error configuring the webhook (status code: {})".format(resp.status_code))
-            print(resp.content)
-          else:
-            print("Set default branch to 'cicd-demo'")
-
-
-          # configure webhook on spring-petclinic
-          data_webhook = '{"type": "gitea", "config": { "url": "' + webhookURL + '", "content_type": "json"}, "events": ["push", "pull_request", "issue_comment"], "active": true}'
-          headers = {'Content-Type': 'application/json'}
-          resp = requests.post(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic/hooks", 
-                              headers = headers, 
-                              auth = (gitea_user, gitea_pwd), 
-                              data = data_webhook) 
-
-          if resp.status_code != 200 and resp.status_code != 201:
-            print("Error configuring the webhook (status code: {})".format(resp.status_code))
-            print(resp.content)
-          else:
-            print("Configured webhook: " + webhookURL)
-
-          # create git repo spring-petclinic-config
-          data_repo = '{"clone_addr": "https://github.com/siamaksade/spring-petclinic-config.git", "uid": 1, "repo_name": "spring-petclinic-config"}'
-          headers = {'Content-Type': 'application/json'}
-          resp = requests.post(url = giteaURL + "/api/v1/repos/migrate", headers = headers, auth = (gitea_user, gitea_pwd), data = data_repo)  
-
-          if resp.status_code != 200 and resp.status_code != 201:
-            print("Error creating git repo (status code: {})".format(resp.status_code))
-            print(resp.content)
-          else:
-            print("Created git repo spring-petclinic-config")
-
-          # create token for user
-          data_token = '{"name": "cicd", "scopes": ["write:admin", "write:issue", "write:misc", "write:notification", "write:repository"]}'
-          headers = {'Content-Type': 'application/json'}
-          resp = requests.post(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens", headers = headers, auth = (gitea_user, gitea_pwd), data = data_token)  
-          resp.raise_for_status()
-          gitea_token = resp.json()["sha1"]
-          print("## Token: " + gitea_token + " ##")
-
-          os.popen('oc create secret generic gitea --from-literal=token=' + gitea_token + ' --from-literal=webhook=""')
+            print("Warning: No token available to create secret")
