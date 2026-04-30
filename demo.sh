@@ -112,6 +112,10 @@ command.install() {
 
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
+
+  info "Creating custom Tekton tasks"
+  oc apply -f tasks -n $cicd_prj
+
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
 
   info "Initiatlizing git repository in Gitea and configuring webhooks"
@@ -166,6 +170,9 @@ command.install() {
   TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name}")
   GITEA_TOKEN=$(oc logs $TASKRUN_NAME-pod -n $cicd_prj | grep Token | sed 's/^## Token: \(.*\) ##$/\1/g')
 
+  info "Generating webhook secret for Pipelines-as-Code"
+  WEBHOOK_SECRET=$(openssl rand -hex 20)
+
 cat << EOF > /tmp/tmp-pac-repository.yaml
 ---
 apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
@@ -193,9 +200,14 @@ metadata:
 type: Opaque
 stringData:
   token: "$GITEA_TOKEN"
-  webhook: ""
+  webhook: "$WEBHOOK_SECRET"
 EOF
-  oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
+  oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj
+
+  info "Updating Gitea webhook with secret"
+  curl -k -X PATCH -H "Content-Type: application/json" -H "Authorization: token $GITEA_TOKEN" \
+    -d "{\"config\": {\"content_type\": \"json\", \"url\": \"https://$WEBHOOK_URL\", \"secret\": \"$WEBHOOK_SECRET\"}, \"events\": [\"push\", \"pull_request\", \"issue_comment\"], \"active\": true}" \
+    "https://$GITEA_HOSTNAME/api/v1/repos/gitea/spring-petclinic/hooks/1"
 
   wait_seconds 10
 

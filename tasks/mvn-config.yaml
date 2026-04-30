@@ -1,0 +1,68 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: mvn-config
+spec:
+  description: Configure Maven settings.xml
+  workspaces:
+    - name: workspace
+      description: Workspace containing the source code
+  steps:
+    - name: create-settings
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      script: |
+        #!/bin/sh
+        set -e
+
+        mkdir -p $(workspaces.workspace.path)/.m2
+
+        cat > $(workspaces.workspace.path)/.m2/settings.xml <<EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+          <mirrors>
+            <mirror>
+              <id>nexus</id>
+              <mirrorOf>*</mirrorOf>
+              <url>http://nexus:8081/repository/maven-public/</url>
+            </mirror>
+          </mirrors>
+          <profiles>
+            <profile>
+              <id>nexus</id>
+              <repositories>
+                <repository>
+                  <id>central</id>
+                  <url>http://central</url>
+                  <releases><enabled>true</enabled></releases>
+                  <snapshots><enabled>true</enabled></snapshots>
+                </repository>
+              </repositories>
+              <pluginRepositories>
+                <pluginRepository>
+                  <id>central</id>
+                  <url>http://central</url>
+                  <releases><enabled>true</enabled></releases>
+                  <snapshots><enabled>true</enabled></snapshots>
+                </pluginRepository>
+              </pluginRepositories>
+            </profile>
+            <profile>
+              <id>sonar</id>
+              <properties>
+                <sonar.host.url>http://sonarqube:9000</sonar.host.url>
+                <sonar.login>admin</sonar.login>
+                <sonar.password>sonarqube</sonar.password>
+              </properties>
+            </profile>
+          </profiles>
+          <activeProfiles>
+            <activeProfile>nexus</activeProfile>
+            <activeProfile>sonar</activeProfile>
+          </activeProfiles>
+        </settings>
+        EOF
+
+        echo "Maven settings.xml created at $(workspaces.workspace.path)/.m2/settings.xml"
+        cat $(workspaces.workspace.path)/.m2/settings.xml

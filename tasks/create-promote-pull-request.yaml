@@ -1,0 +1,121 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: create-promote-pull-request
+spec:
+  description: Create a pull request to promote changes from one environment to another
+  params:
+    - name: GIT_REPOSITORY
+      type: string
+      description: The git repository URL
+    - name: GIT_USERNAME
+      type: string
+      description: Git username
+    - name: GIT_PASSWORD
+      type: string
+      description: Git password
+    - name: COPY_FROM_PATH
+      type: string
+      description: Path to copy from (e.g., environments/dev)
+    - name: COPY_TO_PATH
+      type: string
+      description: Path to copy to (e.g., environments/stage)
+  workspaces:
+    - name: workspace
+      description: Workspace containing the manifests
+  steps:
+    - name: create-pr
+      image: quay.io/siamaksade/python-oc:latest
+      script: |
+        #!/usr/bin/env python3
+
+        import subprocess
+        import os
+        import sys
+        import re
+        from datetime import datetime
+
+        git_repo = "$(params.GIT_REPOSITORY)"
+        git_user = "$(params.GIT_USERNAME)"
+        git_pass = "$(params.GIT_PASSWORD)"
+        copy_from = "$(params.COPY_FROM_PATH)"
+        copy_to = "$(params.COPY_TO_PATH)"
+        workspace = "$(workspaces.workspace.path)"
+
+        # Extract git server URL and repo path
+        match = re.search(r'https://([^/]+)/(.+)', git_repo)
+        if not match:
+            print(f"Could not parse git repository URL: {git_repo}")
+            sys.exit(1)
+
+        git_host = match.group(1)
+        repo_path = match.group(2).rstrip('.git')
+        auth_url = f"https://{git_user}:{git_pass}@{git_host}/{repo_path}"
+
+        # Clone the repository
+        clone_dir = f"{workspace}/config-repo"
+        os.makedirs(clone_dir, exist_ok=True)
+
+        print(f"Cloning {git_repo}...")
+        subprocess.run(["git", "clone", auth_url, clone_dir], check=True)
+
+        os.chdir(clone_dir)
+
+        # Configure git
+        subprocess.run(["git", "config", "user.email", "tekton@pipeline.com"], check=True)
+        subprocess.run(["git", "config", "user.name", "Tekton Pipeline"], check=True)
+
+        # Create a new branch
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        branch_name = f"promote-to-stage-{timestamp}"
+
+        print(f"Creating branch {branch_name}...")
+        subprocess.run(["git", "checkout", "-b", branch_name], check=True)
+
+        # Copy files from source to destination
+        print(f"Copying from {copy_from} to {copy_to}...")
+        subprocess.run(["cp", "-r", copy_from + "/.", copy_to + "/"], check=True)
+
+        # Commit changes
+        subprocess.run(["git", "add", copy_to], check=True)
+
+        try:
+            subprocess.run(["git", "commit", "-m", f"Promote changes from {copy_from} to {copy_to}"], check=True)
+        except subprocess.CalledProcessError:
+            print("No changes to commit")
+            sys.exit(0)
+
+        # Push the branch
+        print(f"Pushing branch {branch_name}...")
+        subprocess.run(["git", "push", "origin", branch_name], check=True)
+
+        # Create pull request using Gitea API
+        import requests
+        import json
+
+        api_url = f"https://{git_host}/api/v1/repos/{repo_path}/pulls"
+        headers = {"Content-Type": "application/json"}
+
+        pr_data = {
+            "title": f"Promote to STAGE - {timestamp}",
+            "head": branch_name,
+            "base": "main",
+            "body": f"Automated promotion from {copy_from} to {copy_to}"
+        }
+
+        print(f"Creating pull request at {api_url}...")
+        response = requests.post(
+            api_url,
+            headers=headers,
+            auth=(git_user, git_pass),
+            data=json.dumps(pr_data),
+            verify=False
+        )
+
+        if response.status_code in [200, 201]:
+            print(f"Pull request created successfully!")
+            print(response.json())
+        else:
+            print(f"Failed to create pull request: {response.status_code}")
+            print(response.text)
+            sys.exit(1)
