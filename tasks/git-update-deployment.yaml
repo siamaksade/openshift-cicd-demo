@@ -31,118 +31,66 @@ spec:
       description: Workspace containing the source
   steps:
     - name: update-manifests
-      image: quay.io/siamaksade/python-oc:latest
+      image: alpine/git:latest
       script: |
-        #!/usr/bin/env python3
+        #!/bin/sh
+        set -ex
 
-        import subprocess
-        import os
-        import sys
-        import re
-
-        git_repo = "$(params.GIT_REPOSITORY)"
-        git_user = "$(params.GIT_USERNAME)"
-        git_pass = "$(params.GIT_PASSWORD)"
-        current_image = "$(params.CURRENT_IMAGE)"
-        new_image = "$(params.NEW_IMAGE)"
-        new_digest = "$(params.NEW_DIGEST)"
-        kustomization_path = "$(params.KUSTOMIZATION_PATH)"
-        workspace = "$(workspaces.workspace.path)"
+        GIT_REPO="$(params.GIT_REPOSITORY)"
+        GIT_USER="$(params.GIT_USERNAME)"
+        GIT_PASS="$(params.GIT_PASSWORD)"
+        CURRENT_IMAGE="$(params.CURRENT_IMAGE)"
+        NEW_IMAGE="$(params.NEW_IMAGE)"
+        NEW_DIGEST="$(params.NEW_DIGEST)"
+        KUST_PATH="$(params.KUSTOMIZATION_PATH)"
+        WORKSPACE="$(workspaces.workspace.path)"
 
         # Build the new image reference with digest
-        new_image_with_digest = f"{new_image}@{new_digest}"
+        NEW_IMAGE_WITH_DIGEST="${NEW_IMAGE}@${NEW_DIGEST}"
 
-        # Extract git server URL
-        match = re.search(r'https://([^/]+)/(.+)', git_repo)
-        if not match:
-            print(f"Could not parse git repository URL: {git_repo}")
-            sys.exit(1)
+        # Extract git server and repo path
+        GIT_HOST=$(echo "$GIT_REPO" | sed 's|https://||' | cut -d'/' -f1)
+        REPO_PATH=$(echo "$GIT_REPO" | sed 's|https://[^/]*/||' | sed 's|\.git$||')
 
-        git_host = match.group(1)
-        repo_path = match.group(2).rstrip('.git')
-        auth_url = f"https://{git_user}:{git_pass}@{git_host}/{repo_path}"
+        # Build authenticated URL
+        AUTH_URL="https://${GIT_USER}:${GIT_PASS}@${GIT_HOST}/${REPO_PATH}"
 
         # Clone the repository
-        clone_dir = f"{workspace}/manifests-repo"
-        os.makedirs(clone_dir, exist_ok=True)
+        CLONE_DIR="${WORKSPACE}/manifests-repo"
+        echo "Cloning ${GIT_REPO}..."
+        git clone "$AUTH_URL" "$CLONE_DIR"
 
-        print(f"Cloning {git_repo}...")
-        subprocess.run(["git", "clone", auth_url, clone_dir], check=True)
-
-        os.chdir(clone_dir)
+        cd "$CLONE_DIR"
 
         # Configure git
-        subprocess.run(["git", "config", "user.email", "tekton@pipeline.com"], check=True)
-        subprocess.run(["git", "config", "user.name", "Tekton Pipeline"], check=True)
+        git config user.email "tekton@pipeline.com"
+        git config user.name "Tekton Pipeline"
 
         # Update kustomization.yaml
-        kustomization_file = f"{kustomization_path}/kustomization.yaml"
+        KUST_FILE="${KUST_PATH}/kustomization.yaml"
+        echo "Updating ${KUST_FILE}..."
+        echo "Old image: ${CURRENT_IMAGE}"
+        echo "New image: ${NEW_IMAGE_WITH_DIGEST}"
 
-        print(f"Updating {kustomization_file}...")
-        print(f"Old image: {current_image}")
-        print(f"New image: {new_image_with_digest}")
+        # Simple sed-based replacement
+        # Replace the image reference in the kustomization file
+        sed -i "s|${CURRENT_IMAGE}|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
+        sed -i "s|${NEW_IMAGE}:latest|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
+        sed -i "s|${NEW_IMAGE}@sha256:[a-f0-9]*|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
 
-        # Read the file
-        with open(kustomization_file, 'r') as f:
-            content = f.read()
-
-        # Replace image reference - handle both with and without digest
-        # Pattern matches lines like:
-        #   newName: image-registry.openshift-image-registry.svc:5000/demo-cicd/spring-petclinic
-        #   newTag: latest
-        # OR
-        #   - image-registry.openshift-image-registry.svc:5000/demo-cicd/spring-petclinic:latest
-        #   - image-registry.openshift-image-registry.svc:5000/demo-cicd/spring-petclinic@sha256:...
-
-        # Check if using images list format or newName/newTag format
-        if 'newName:' in content and 'newTag:' in content:
-            # Replace newName and newTag with newName and digest
-            content = re.sub(
-                r'(newName:\s*).*',
-                f'\\1{new_image}',
-                content
-            )
-            # Remove newTag line if exists
-            content = re.sub(r'\s*newTag:.*\n', '', content)
-            # Add digest after newName
-            content = re.sub(
-                r'(newName:\s*.*)\n',
-                f'\\1\n    digest: {new_digest}\n',
-                content
-            )
-        else:
-            # Simple replacement in images list
-            content = re.sub(
-                r'- ' + re.escape(current_image) + r'(:latest|@sha256:[a-f0-9]+)?',
-                f'- {new_image_with_digest}',
-                content
-            )
-            content = re.sub(
-                r'- ' + re.escape(new_image) + r'(:latest|@sha256:[a-f0-9]+)?',
-                f'- {new_image_with_digest}',
-                content
-            )
-
-        # Write back
-        with open(kustomization_file, 'w') as f:
-            f.write(content)
-
-        print("Updated kustomization.yaml:")
-        subprocess.run(["cat", kustomization_file])
+        echo "Updated kustomization.yaml:"
+        cat "$KUST_FILE"
 
         # Commit and push
-        subprocess.run(["git", "add", kustomization_path], check=True)
+        git add "$KUST_PATH"
 
-        try:
-            subprocess.run([
-                "git", "commit", "-m",
-                f"Update {kustomization_path} with image {new_image_with_digest}"
-            ], check=True)
-        except subprocess.CalledProcessError:
-            print("No changes to commit")
-            sys.exit(0)
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
 
-        print("Pushing changes...")
-        subprocess.run(["git", "push", "origin", "main"], check=True)
+        git commit -m "Update ${KUST_PATH} with image ${NEW_IMAGE_WITH_DIGEST}"
+        echo "Pushing changes..."
+        git push origin main
 
-        print("Successfully updated manifests!")
+        echo "Successfully updated manifests!"
