@@ -21,6 +21,10 @@ spec:
       type: string
       description: The pipelines-as-code webhook url
       default: "@webhook-url@"
+    - name: WEBHOOK_SECRET
+      type: string
+      description: The webhook secret for signature validation
+      default: "@webhook-secret@"
     stepTemplate:
       env:
         - name: NAMESPACE
@@ -40,6 +44,7 @@ spec:
           gitea_pwd = "$(params.GITEA_PASSWORD)"
           giteaURL = "$(params.GITEA_URL)"
           webhookURL = "$(params.WEBHOOK_URL)"
+          webhookSecret = "$(params.WEBHOOK_SECRET)"
 
           # create admin user
           data_user = {
@@ -84,7 +89,7 @@ spec:
 
 
           # configure webhook on spring-petclinic
-          data_webhook = '{"type": "gitea", "config": { "url": "' + webhookURL + '", "content_type": "json"}, "events": ["push", "pull_request", "issue_comment"], "active": true}'
+          data_webhook = '{"type": "gitea", "config": { "url": "' + webhookURL + '", "content_type": "json", "secret": "' + webhookSecret + '"}, "events": ["push", "pull_request", "issue_comment"], "active": true}'
           headers = {'Content-Type': 'application/json'}
           resp = requests.post(url = giteaURL + "/api/v1/repos/" + gitea_user + "/spring-petclinic/hooks", 
                               headers = headers, 
@@ -111,9 +116,8 @@ spec:
           # create token for user
           data_token = '{"name": "cicd", "scopes": ["write:admin", "write:issue", "write:misc", "write:notification", "write:repository"]}'
           headers = {'Content-Type': 'application/json'}
-          resp = requests.post(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens", headers = headers, auth = (gitea_user, gitea_pwd), data = data_token)  
+          resp = requests.post(url = giteaURL + "/api/v1/users/" + gitea_user + "/tokens", headers = headers, auth = (gitea_user, gitea_pwd), data = data_token)
           resp.raise_for_status()
           gitea_token = resp.json()["sha1"]
           print("## Token: " + gitea_token + " ##")
-
-          os.popen('oc create secret generic gitea --from-literal=token=' + gitea_token + ' --from-literal=webhook=""')
+          print("## WebhookSecret: " + webhookSecret + " ##")
