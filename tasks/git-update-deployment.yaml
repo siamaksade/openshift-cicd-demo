@@ -1,0 +1,96 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-update-deployment
+spec:
+  description: Update deployment manifests with new image digest
+  params:
+    - name: GIT_REPOSITORY
+      type: string
+      description: The git repository URL
+    - name: GIT_USERNAME
+      type: string
+      description: Git username
+    - name: GIT_PASSWORD
+      type: string
+      description: Git password
+    - name: CURRENT_IMAGE
+      type: string
+      description: Current image reference
+    - name: NEW_IMAGE
+      type: string
+      description: New image reference (without digest)
+    - name: NEW_DIGEST
+      type: string
+      description: New image digest
+    - name: KUSTOMIZATION_PATH
+      type: string
+      description: Path to kustomization directory (e.g., environments/dev)
+  workspaces:
+    - name: workspace
+      description: Workspace containing the source
+  steps:
+    - name: update-manifests
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -ex
+
+        GIT_REPO="$(params.GIT_REPOSITORY)"
+        GIT_USER="$(params.GIT_USERNAME)"
+        GIT_PASS="$(params.GIT_PASSWORD)"
+        CURRENT_IMAGE="$(params.CURRENT_IMAGE)"
+        NEW_IMAGE="$(params.NEW_IMAGE)"
+        NEW_DIGEST="$(params.NEW_DIGEST)"
+        KUST_PATH="$(params.KUSTOMIZATION_PATH)"
+        WORKSPACE="$(workspaces.workspace.path)"
+
+        # Build the new image reference with digest
+        NEW_IMAGE_WITH_DIGEST="${NEW_IMAGE}@${NEW_DIGEST}"
+
+        # Extract git server and repo path
+        GIT_HOST=$(echo "$GIT_REPO" | sed 's|https://||' | cut -d'/' -f1)
+        REPO_PATH=$(echo "$GIT_REPO" | sed 's|https://[^/]*/||' | sed 's|\.git$||')
+
+        # Build authenticated URL
+        AUTH_URL="https://${GIT_USER}:${GIT_PASS}@${GIT_HOST}/${REPO_PATH}"
+
+        # Clone the repository
+        CLONE_DIR="${WORKSPACE}/manifests-repo"
+        echo "Cloning ${GIT_REPO}..."
+        git clone "$AUTH_URL" "$CLONE_DIR"
+
+        cd "$CLONE_DIR"
+
+        # Configure git
+        git config user.email "tekton@pipeline.com"
+        git config user.name "Tekton Pipeline"
+
+        # Update kustomization.yaml
+        KUST_FILE="${KUST_PATH}/kustomization.yaml"
+        echo "Updating ${KUST_FILE}..."
+        echo "Old image: ${CURRENT_IMAGE}"
+        echo "New image: ${NEW_IMAGE_WITH_DIGEST}"
+
+        # Simple sed-based replacement
+        # Replace the image reference in the kustomization file
+        sed -i "s|${CURRENT_IMAGE}|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
+        sed -i "s|${NEW_IMAGE}:latest|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
+        sed -i "s|${NEW_IMAGE}@sha256:[a-f0-9]*|${NEW_IMAGE_WITH_DIGEST}|g" "$KUST_FILE"
+
+        echo "Updated kustomization.yaml:"
+        cat "$KUST_FILE"
+
+        # Commit and push
+        git add "$KUST_PATH"
+
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+
+        git commit -m "Update ${KUST_PATH} with image ${NEW_IMAGE_WITH_DIGEST}"
+        echo "Pushing changes..."
+        git push origin main
+
+        echo "Successfully updated manifests!"

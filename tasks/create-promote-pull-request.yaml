@@ -1,0 +1,107 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: create-promote-pull-request
+spec:
+  description: Create a pull request to promote changes from one environment to another
+  params:
+    - name: GIT_REPOSITORY
+      type: string
+      description: The git repository URL
+    - name: GIT_USERNAME
+      type: string
+      description: Git username
+    - name: GIT_PASSWORD
+      type: string
+      description: Git password
+    - name: COPY_FROM_PATH
+      type: string
+      description: Path to copy from (e.g., environments/dev)
+    - name: COPY_TO_PATH
+      type: string
+      description: Path to copy to (e.g., environments/stage)
+  workspaces:
+    - name: workspace
+      description: Workspace containing the manifests
+  steps:
+    - name: create-pr
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -ex
+
+        # Install curl for API calls
+        apk add --no-cache curl jq
+
+        GIT_REPO="$(params.GIT_REPOSITORY)"
+        GIT_USER="$(params.GIT_USERNAME)"
+        GIT_PASS="$(params.GIT_PASSWORD)"
+        COPY_FROM="$(params.COPY_FROM_PATH)"
+        COPY_TO="$(params.COPY_TO_PATH)"
+        WORKSPACE="$(workspaces.workspace.path)"
+
+        # Extract git server and repo path
+        GIT_HOST=$(echo "$GIT_REPO" | sed 's|https://||' | cut -d'/' -f1)
+        REPO_PATH=$(echo "$GIT_REPO" | sed 's|https://[^/]*/||' | sed 's|\.git$||')
+
+        # Build authenticated URL
+        AUTH_URL="https://${GIT_USER}:${GIT_PASS}@${GIT_HOST}/${REPO_PATH}"
+
+        # Clone the repository
+        CLONE_DIR="${WORKSPACE}/config-repo"
+        echo "Cloning ${GIT_REPO}..."
+        git clone "$AUTH_URL" "$CLONE_DIR"
+
+        cd "$CLONE_DIR"
+
+        # Configure git
+        git config user.email "tekton@pipeline.com"
+        git config user.name "Tekton Pipeline"
+
+        # Create a new branch
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        BRANCH_NAME="promote-to-stage-${TIMESTAMP}"
+
+        echo "Creating branch ${BRANCH_NAME}..."
+        git checkout -b "$BRANCH_NAME"
+
+        # Copy files from source to destination
+        echo "Copying from ${COPY_FROM} to ${COPY_TO}..."
+        cp -r "${COPY_FROM}/." "${COPY_TO}/"
+
+        # Commit changes
+        git add "$COPY_TO"
+
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+
+        git commit -m "Promote changes from ${COPY_FROM} to ${COPY_TO}"
+
+        # Push the branch
+        echo "Pushing branch ${BRANCH_NAME}..."
+        git push origin "$BRANCH_NAME"
+
+        # Create pull request using Gitea API
+        API_URL="https://${GIT_HOST}/api/v1/repos/${REPO_PATH}/pulls"
+        PR_TITLE="Promote to STAGE - ${TIMESTAMP}"
+        PR_BODY="Automated promotion from ${COPY_FROM} to ${COPY_TO}"
+
+        echo "Creating pull request at ${API_URL}..."
+        RESPONSE=$(curl -k -X POST \
+          -H "Content-Type: application/json" \
+          -u "${GIT_USER}:${GIT_PASS}" \
+          -d "{\"title\": \"${PR_TITLE}\", \"head\": \"${BRANCH_NAME}\", \"base\": \"main\", \"body\": \"${PR_BODY}\"}" \
+          "${API_URL}")
+
+        echo "API Response:"
+        echo "$RESPONSE"
+
+        # Check if PR was created successfully
+        if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
+          echo "Pull request created successfully!"
+        else
+          echo "Failed to create pull request"
+          exit 1
+        fi

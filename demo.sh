@@ -112,17 +112,27 @@ command.install() {
 
   info "Deploying CI/CD infra to $cicd_prj namespace"
   oc apply -f infra -n $cicd_prj
+
+  info "Creating custom Tekton tasks"
+  oc apply -f tasks -n $cicd_prj
+
   GITEA_HOSTNAME=$(oc get route gitea -o template --template='{{.spec.host}}' -n $cicd_prj)
+
+  info "Generating webhook secret for Pipelines-as-Code"
+  WEBHOOK_SECRET=$(openssl rand -hex 20)
 
   info "Initiatlizing git repository in Gitea and configuring webhooks"
   WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n pipelines-as-code -o template --template="{{.spec.host}}"  --ignore-not-found)
-  if [ -z "$WEBHOOK_URL" ]; then 
+  if [ -z "$WEBHOOK_URL" ]; then
       WEBHOOK_URL=$(oc get route pipelines-as-code-controller -n openshift-pipelines -o template --template="{{.spec.host}}")
   fi
 
   sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml | oc create -f - -n $cicd_prj
   oc rollout status deployment/gitea -n $cicd_prj
-  sed "s#@webhook-url@#https://$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | sed "s#@gitea-url@#https://$GITEA_HOSTNAME#g" |  oc create -f - -n $cicd_prj
+  sed "s#@webhook-url@#https://$WEBHOOK_URL#g" config/gitea-init-taskrun.yaml | \
+    sed "s#@gitea-url@#https://$GITEA_HOSTNAME#g" | \
+    sed "s#@webhook-secret@#$WEBHOOK_SECRET#g" | \
+    oc create -f - -n $cicd_prj
 
 
   wait_seconds 20
@@ -148,16 +158,27 @@ command.install() {
   info "Updating pipelinerun values for the demo environment"
   tmp_dir=$(mktemp -d)
   pushd $tmp_dir
-  git clone https://$GITEA_HOSTNAME/gitea/spring-petclinic 
-  cd spring-petclinic 
+  git clone https://$GITEA_HOSTNAME/gitea/spring-petclinic
+  cd spring-petclinic
+  git checkout cicd-demo
   git config user.email "openshift-pipelines@redhat.com"
   git config user.name "openshift-pipelines"
-  cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
+
+  # Update git repository URLs
   cross_sed "s#https://github.com/siamaksade/spring-petclinic-config#https://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
-  cat .tekton/build.yaml | grep -A 2 GIT_REPOSITORY
+  cross_sed "s#https://gitea-demo-cicd.apps.demo1.0e60.p1.openshiftapps.com/gitea/spring-petclinic-config#https://$GITEA_HOSTNAME/gitea/spring-petclinic-config#g" .tekton/build.yaml
+
+  # Update custom task references to use cluster resolver
+  # This perl script finds taskRef sections with simple name references and converts them to cluster resolver format
+  perl -i -p0e "s/taskRef: *\n *name: mvn-config/taskRef:\n          resolver: cluster\n          params:\n          - name: name\n            value: mvn-config\n          - name: namespace\n            value: $cicd_prj\n          - name: kind\n            value: task/g" .tekton/build.yaml
+
+  perl -i -p0e "s/taskRef:\n *name: git-update-deployment/taskRef:\n          resolver: cluster\n          params:\n          - name: name\n            value: git-update-deployment\n          - name: namespace\n            value: $cicd_prj\n          - name: kind\n            value: task/g" .tekton/build.yaml
+
+  perl -i -p0e "s/taskRef:\n *name: create-promote-pull-request/taskRef:\n          resolver: cluster\n          params:\n          - name: name\n            value: create-promote-pull-request\n          - name: namespace\n            value: $cicd_prj\n          - name: kind\n            value: task/g" .tekton/build.yaml
+
   git status
   git add .tekton/build.yaml
-  git commit -m "Updated manifests git url"
+  git commit -m "Updated for local environment"
   git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
   git push auth-origin cicd-demo
   popd
@@ -166,7 +187,14 @@ command.install() {
   TASKRUN_NAME=$(oc get taskrun -n $cicd_prj -o jsonpath="{.items[0].metadata.name}")
   GITEA_TOKEN=$(oc logs $TASKRUN_NAME-pod -n $cicd_prj | grep Token | sed 's/^## Token: \(.*\) ##$/\1/g')
 
-cat << EOF > /tmp/tmp-pac-repository.yaml
+  info "Creating Gitea secret with token and webhook secret"
+  oc create secret generic gitea \
+    --from-literal=token="$GITEA_TOKEN" \
+    --from-literal=webhook="$WEBHOOK_SECRET" \
+    -n $cicd_prj
+
+  info "Creating Pipelines-as-Code Repository CR"
+  oc apply -f - <<EOF
 ---
 apiVersion: "pipelinesascode.tekton.dev/v1alpha1"
 kind: Repository
@@ -184,20 +212,42 @@ spec:
     webhook_secret:
       name: "gitea"
       key: "webhook"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitea
-  namespace: $cicd_prj
-type: Opaque
-stringData:
-  token: "$GITEA_TOKEN"
-  webhook: ""
 EOF
-  oc apply -f /tmp/tmp-pac-repository.yaml -n $cicd_prj 
 
   wait_seconds 10
+
+  info "Updating route configuration in spring-petclinic-config repository"
+  tmp_dir=$(mktemp -d)
+  pushd $tmp_dir
+  git clone https://$GITEA_HOSTNAME/gitea/spring-petclinic-config
+  cd spring-petclinic-config
+  git config user.email "openshift-pipelines@redhat.com"
+  git config user.name "openshift-pipelines"
+
+  # Update route.yaml to support both HTTP and HTTPS
+  cat > app/route.yaml <<EOF
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: spring-petclinic
+spec:
+  port:
+    targetPort: 8080-tcp
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Allow
+  to:
+    kind: Service
+    name: spring-petclinic
+    weight: 100
+  wildcardPolicy: None
+EOF
+
+  git add app/route.yaml
+  git commit -m "Add HTTPS support to routes"
+  git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic-config
+  git push auth-origin master
+  popd
 
   info "Configure Argo CD"
 

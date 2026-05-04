@@ -15,8 +15,8 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 ## Tested Configuration
 
-* OpenShift GitOps 1.15
-* OpenShift Pipelines 1.17
+* OpenShift GitOps 1.20
+* OpenShift Pipelines 1.22
 
 ## Continuous Integration
 

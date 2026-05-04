@@ -183,7 +183,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: sonarqube-postgresql
-          image: docker.io/bitnami/postgresql:11.14.0-debian-10-r22
+          image: docker.io/bitnami/postgresql:latest
           imagePullPolicy: "IfNotPresent"
           resources:
             limits:
