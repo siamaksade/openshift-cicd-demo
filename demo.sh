@@ -178,7 +178,7 @@ command.install() {
 
   git status
   git add .tekton/build.yaml
-  git commit -m "Updated for local environment"
+  git diff --staged --quiet || git commit -m "Updated for local environment"
   git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic
   git push auth-origin cicd-demo
   popd
@@ -244,7 +244,7 @@ spec:
 EOF
 
   git add app/route.yaml
-  git commit -m "Add HTTPS support to routes"
+  git diff --staged --quiet || git commit -m "Add HTTPS support to routes"
   git remote add auth-origin https://gitea:openshift@$GITEA_HOSTNAME/gitea/spring-petclinic-config
   git push auth-origin master
   popd
