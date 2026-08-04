@@ -1,6 +1,6 @@
 # About this fork
 
-This work is a fork of https://github.com/siamaksade/openshift-cicd-demo for the use case of on-premises virtualized OpenShift environments for demo purposes, where you wouldn't have a paid certificate or instead you are relying on the default Ingress CA. Perhaps you installed OpenShift on an SNO environment or even you're using OpenShift Local (AKA CRC) for your demo.
+This work is a fork of https://github.com/siamaksade/openshift-cicd-demo for on-premises virtualized OpenShift demo environments, including SNO and OpenShift Local (AKA CRC). The installers support the OpenShift-generated router CA, a user-provided private CA bundle, or an already trusted/public CA. They can also configure a user-provided wildcard certificate and private key for the default Ingress Controller.
 
 If using the demo on Codeready Containers (OpenShift Local) on Windows 11, set your WSL2 to use mirror network mode so that the ingress controller can be reached from the host. This is done by creating the following in the WSL2 config file `$HOME/.wslconfig`.
 
@@ -9,29 +9,12 @@ If using the demo on Codeready Containers (OpenShift Local) on Windows 11, set y
 networkingMode=mirrored
 ```
 
-The only pre-requisite in this regard is that you obtain your ingress default CA (or your custom CA) and then add that CA to the proxy/cluster object in OpenShift before installing this demo, besides other pre-requisites that are documented in this README file.
+The cluster-wide trusted CA bundle and the certificate served by Ingress are separate settings:
 
-This is the procedure you can follow on RHEL or RHEL derivatives. This was tested on RHEL 9.
+* `proxy/cluster.spec.trustedCA` adds private CA certificates to the trust used by cluster components for HTTPS connections.
+* `IngressController.spec.defaultCertificate` selects the TLS identity presented by routes that do not define their own certificate.
 
-```shell
-oc get secret/router-ca -n openshift-ingress-operator -o jsonpath='{.data.tls\.crt}' |base64 -d > ingress-ca.crt
-# For Fedora:
-sudo cp ingress-ca.crt /etc/pki/ca-trust/source/anchors
-sudo update-ca-trust
-
-# For Ubuntu:
-sudo cp ingress-ca.crt /usr/local/share/ca-certificates
-sudo update-ca-certificates
-
-oc create configmap custom-ca --from-file ca-bundle.crt=./ingress-ca.crt -n openshift-config
-oc patch proxy/cluster --type=merge -p '{"spec":{"trustedCA":{"name":"custom-ca"}}}'
-
-# wait for the pods to be restarted
-
-watch oc get pods -n openshift-apiserver
-```
-
-Also import the CA to your local machine, so you can access the OpenShift console and the Gitea instance without certificate errors.
+The scripts configure these settings according to the options described below. They do not modify the trust store of the machine from which you run the installer. For browser and CLI access outside this script, import a private CA into that machine's trust store separately.
 
 
 # CI/CD Demo with Tekton and Argo CD on OpenShift
@@ -53,6 +36,106 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 
 * OpenShift GitOps 1.16
 * OpenShift Pipelines 1.18
+
+## CA and Ingress TLS options
+
+The CA mode controls both cluster trust and the Git TLS environment used by the
+installer:
+
+| Mode | Cluster trust | Custom Ingress certificate validation | Installer HTTPS clients |
+| --- | --- | --- | --- |
+| `router` (default) | Reads `openshift-ingress-operator/router-ca`, stores it in `openshift-config/custom-ca`, and references that ConfigMap from `proxy/cluster.spec.trustedCA`. | Not accepted; select `file` or `none` explicitly for a custom certificate. | Preserves the historical demo posture: Git uses `GIT_SSL_NO_VERIFY=true` and the bounded Gitea readiness probe uses `curl --insecure`. |
+| `file` | Uses the complete PEM CA bundle supplied through `--ca-file` or `-CaFile`. The default ConfigMap name is `<prefix>-trusted-ca`. | Validates the certificate chain against the supplied CA bundle. | Git uses `GIT_SSL_CAINFO` and the Gitea readiness probe uses `curl --cacert` with that file. |
+| `none` | Leaves `proxy/cluster.spec.trustedCA` unchanged. | When a custom certificate is supplied, validates its chain against `openshift-config-managed/trusted-ca-bundle`; the required CA must already be present in that managed cluster bundle. | Leaves inherited Git trust variables unchanged; `curl` uses its normal inherited/system trust configuration. |
+
+On an implicit default `router` rerun, an already referenced `custom-ca` is not
+overwritten. The installer verifies that it contains the current router CA and
+that the managed bundle and cluster operators are stable. If it does not contain
+that CA, the run fails. Pass `--ca-mode router` or `-CaMode router` explicitly to
+refresh it from `router-ca`.
+
+To change the certificate served by Ingress, explicitly select `file` or `none`
+and provide both the certificate chain and matching private key. The PEM chain is
+strictly validated in this order: a non-CA leaf (`CA:FALSE`), zero or more CA
+intermediates, and a self-signed root CA. Each certificate must be signed by the
+next certificate in the file, and the leaf must include the exact wildcard SAN
+`*.<ingress-domain>`, such as `*.apps.<cluster>.<domain>`. The private key must be
+PEM encoded, unencrypted, and match the leaf. These requirements follow the
+[OpenShift procedure for replacing the default Ingress certificate](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/security_and_compliance/configuring-certificates#replacing-the-default-ingress-certificate_configuring-certificates).
+
+OpenSSL 1.1.1 or newer is required and enforced when using a CA file or a custom
+Ingress certificate. Before making cluster changes, both installers parse every
+certificate, reject private keys mixed into CA/certificate bundles, check
+expiration, verify the wildcard SAN, key and strict chain, and ask `oc` to render
+the TLS Secret with client-side dry-run. Never copy a private key into this
+checkout or commit it to Git; reference it from a protected location outside the
+repository.
+
+Both entry points disable statement tracing (`set +x` or `Set-PSDebug -Off`) so
+trace output cannot reveal key material. Do not re-enable tracing during
+installation; if PowerShell tracing was intentionally active beforehand,
+re-enable it explicitly after the script finishes.
+
+Examples with Bash:
+
+```shell
+# Historical behavior: use the OpenShift-generated router CA.
+./demo.sh install
+
+# Certificate issued by a public CA already trusted by the cluster and local host.
+./demo.sh install --ca-mode none \
+  --ingress-tls-cert /secure/pki/wildcard-chain.pem \
+  --ingress-tls-key /secure/pki/wildcard.key
+
+# Certificate issued by a private corporate CA.
+./demo.sh install --ca-mode file \
+  --ca-file /secure/pki/corporate-ca-bundle.pem \
+  --ingress-tls-cert /secure/pki/wildcard-chain.pem \
+  --ingress-tls-key /secure/pki/wildcard.key
+```
+
+Equivalent PowerShell examples:
+
+```powershell
+.\demo.ps1 install
+
+.\demo.ps1 install -CaMode none `
+  -IngressTlsCert C:\secure\pki\wildcard-chain.pem `
+  -IngressTlsKey C:\secure\pki\wildcard.key
+
+.\demo.ps1 install -CaMode file `
+  -CaFile C:\secure\pki\corporate-ca-bundle.pem `
+  -IngressTlsCert C:\secure\pki\wildcard-chain.pem `
+  -IngressTlsKey C:\secure\pki\wildcard.key
+```
+
+The custom TLS Secret defaults to
+`<prefix>-ingress-tls-<sha256-12>`, where the suffix is the first 12 hexadecimal
+characters of the SHA-256 digest over the ordered DER certificate chain. The
+full chain digest is recorded in the Secret annotation
+`openshift-cicd-demo-certificate-chain-sha256`. This gives any changed leaf,
+intermediate, or root certificate a new default Secret name and makes the
+Ingress Controller reconcile a new reference.
+An explicitly named Secret supplied through `--ingress-tls-secret` or
+`-IngressTlsSecret` must either not exist or already carry the same full chain
+digest annotation, TLS Secret type, canonical certificate chain, and
+cryptographically matching private key. A matching existing Secret is reused
+without rewriting its key material; use a new Secret name if the certificate
+chain or key changes. The scripts also reject local certificate/key files that
+change after initial validation.
+
+Override the CA ConfigMap name with `--ca-configmap` in Bash or `-CaConfigMap` in
+PowerShell. The scripts configure only `IngressController/default`, because it
+admits the routes created by this demo. If `proxy/cluster` already references a
+different CA ConfigMap, the installer fails instead of silently replacing it;
+reuse that referenced name only with the complete intended bundle.
+
+The `start` command accepts `--ca-mode`/`--ca-file` or
+`-CaMode`/`-CaFile` as local Git connection settings; it does not change cluster
+trust or Ingress. This lets a later `start` invocation reuse a private CA file.
+The CA ConfigMap and Ingress certificate options remain install-only.
+
+These are cluster-wide changes. Updating the default Ingress certificate affects all routes that rely on it, and changing the trusted CA can restart node services temporarily. The scripts use bounded waits for the managed trust bundle, MachineConfigPools, relevant ClusterOperators, and the default Ingress Controller. `uninstall` does not revert the CA, TLS Secret, or Ingress Controller configuration.
 
 ## Continuous Integration
 
@@ -77,7 +160,7 @@ Argo CD continuously monitor the configurations stored in the Git repository and
 
 1. Get an OpenShift cluster via https://try.openshift.com
 1. Install OpenShift Pipelines and OpenShift GitOps operators 
-1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [OpenShift Pipelines CLI](https://mirror.openshift.com/pub/openshift-v4/clients/pipeline/latest/)
+1. Download [OpenShift CLI](https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/) and [OpenShift Pipelines CLI](https://mirror.openshift.com/pub/openshift-v4/clients/pipeline/latest/), and ensure `git` and `curl` are installed. OpenSSL 1.1.1 or newer is also required for user-provided CA or certificate files.
 1. Run the install script
 
     ```text
