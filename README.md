@@ -28,14 +28,19 @@ This repo is a CI/CD demo using [Tekton Pipelines](http://www.tekton.dev) for co
 * Sonatype Nexus (username/password: `admin`/`admin123`)
 * SonarQube (username/password: `admin`/`admin`)
 
+The Gitea workload uses the upstream rootless image and remains under
+OpenShift's restricted SCC. Its writable runtime directories are ephemeral;
+the database and Git repositories remain on persistent volumes.
+
 <p align="center">
   <img width="580" src="docs/images/projects.svg">
 </p>
 
 ## Tested Configuration
 
-* OpenShift GitOps 1.16
-* OpenShift Pipelines 1.18
+* OpenShift Local (CRC) with OpenShift 4.22.1
+* OpenShift GitOps 1.21.1
+* OpenShift Pipelines 1.23.1
 
 ## CA and Ingress TLS options
 

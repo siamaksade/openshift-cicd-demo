@@ -1586,10 +1586,13 @@ command.install() {
   fi
 
   # Crear o actualizar configmap de Gitea (idempotente)
-  if ! oc get configmap gitea-config -n "$cicd_prj" >/dev/null 2>&1; then
-    sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml | oc apply -f - -n "$cicd_prj"
-  fi
-  oc rollout status deployment/gitea -n "$cicd_prj" --timeout=5m 2>/dev/null || true
+  sed "s/@HOSTNAME/$GITEA_HOSTNAME/g" config/gitea-configmap.yaml |
+    oc apply -f - -n "$cicd_prj" ||
+    err "Could not apply Gitea configuration"
+  oc rollout restart deployment/gitea -n "$cicd_prj" ||
+    err "Could not restart Gitea with the updated configuration"
+  oc rollout status deployment/gitea -n "$cicd_prj" --timeout=5m ||
+    err "Gitea deployment did not become available within 5 minutes"
   
   # Crear taskrun siempre con oc create (tiene generateName, no se puede usar apply)
   info "Creando TaskRun para inicializar Gitea..."

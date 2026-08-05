@@ -13,9 +13,9 @@ metadata:
 data:
   app.ini: |
     APP_NAME = Gitea: Git with a cup of tea
-    RUN_USER = gitea
+    RUN_USER = git
     RUN_MODE = prod
-    WORK_PATH = /home/gitea
+    WORK_PATH = /var/lib/gitea
 
     [security]
     INTERNAL_TOKEN = glXtv83JUc4NQ0RowkSlVnLlVD5lJGE4DC3uFckvJhCuJnNXEpIYLriYnCfXK8FaDELLYtRAsiiOFjlSIK2kLUl7QE8Et31O8WHD6Ld4f
@@ -76,7 +76,7 @@ data:
     [log]
     MODE      = file
     LEVEL     = Info
-    ROOT_PATH = /home/gitea/log
+    ROOT_PATH = /var/lib/gitea/log
 
     [markup.asciidoc]
     ENABLED = true

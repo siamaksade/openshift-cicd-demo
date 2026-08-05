@@ -228,12 +228,18 @@ function Invoke-GitNetwork {
         }
 
         $gitTlsArguments = @(Get-GitTlsArguments)
-        if ($Quiet) {
-            $null = & git @gitTlsArguments @Arguments 2>$null
-        } else {
-            & git @gitTlsArguments @Arguments | Out-Host
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            if ($Quiet) {
+                $null = & git @gitTlsArguments @Arguments 2>$null
+            } else {
+                & git @gitTlsArguments @Arguments | Out-Host
+            }
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
         }
-        $exitCode = $LASTEXITCODE
     } finally {
         if ($hadPrompt) {
             $env:GIT_TERMINAL_PROMPT = $previousPrompt
@@ -579,14 +585,14 @@ function Wait-ForOperator {
         try {
             $subOutput = oc --request-timeout=15s get `
                 subscriptions.operators.coreos.com $SubscriptionName `
-                -n $Namespace -o json 2>$null
+                -n $Namespace --ignore-not-found -o json 2>$null
             if ($subOutput) {
                 $subscription = $subOutput | ConvertFrom-Json
                 $csv = $subscription.status.installedCSV
 
                 if ($csv -and $csv -ne "null" -and $csv -ne "") {
                     $csvOutput = oc --request-timeout=15s get csv $csv `
-                        -n $Namespace -o json 2>$null
+                        -n $Namespace --ignore-not-found -o json 2>$null
                     if ($csvOutput) {
                         $csvObj = $csvOutput | ConvertFrom-Json
                         $phase = $csvObj.status.phase
@@ -623,19 +629,20 @@ function Install-OpenShiftPipelines {
     Write-Info "Instalando operador OpenShift Pipelines..."
     
     # Verificar si el namespace openshift-operators existe
-    $nsExists = oc get ns $namespace 2>$null
+    $nsExists = oc get ns $namespace --ignore-not-found -o name 2>$null
     if (-not $nsExists) {
         Write-Info "Creando namespace $namespace"
         oc create namespace $namespace | Out-Null
     }
     
     # Verificar si ya existe una subscription usando el CRD completo
-    $subExists = oc get subscriptions.operators.coreos.com openshift-pipelines-operator-rh -n $namespace 2>$null
+    $subExists = oc get subscriptions.operators.coreos.com openshift-pipelines-operator-rh `
+        -n $namespace --ignore-not-found -o name 2>$null
     if ($subExists) {
         Write-Info "El operador OpenShift Pipelines ya está suscrito"
     } else {
         # Crear OperatorGroup si no existe
-        $ogExists = oc get operatorgroup -n $namespace 2>$null
+        $ogExists = oc get operatorgroup -n $namespace -o name 2>$null
         if (-not $ogExists) {
             $operatorGroup = @"
 apiVersion: operators.coreos.com/v1
@@ -675,19 +682,20 @@ function Install-OpenShiftGitOps {
     Write-Info "Instalando operador OpenShift GitOps..."
     
     # Verificar si el namespace openshift-operators existe
-    $nsExists = oc get ns $namespace 2>$null
+    $nsExists = oc get ns $namespace --ignore-not-found -o name 2>$null
     if (-not $nsExists) {
         Write-Info "Creando namespace $namespace"
         oc create namespace $namespace | Out-Null
     }
     
     # Verificar si ya existe una subscription usando el CRD completo
-    $subExists = oc get subscriptions.operators.coreos.com openshift-gitops-operator -n $namespace 2>$null
+    $subExists = oc get subscriptions.operators.coreos.com openshift-gitops-operator `
+        -n $namespace --ignore-not-found -o name 2>$null
     if ($subExists) {
         Write-Info "El operador OpenShift GitOps ya está suscrito"
     } else {
         # Crear OperatorGroup si no existe
-        $ogExists = oc get operatorgroup -n $namespace 2>$null
+        $ogExists = oc get operatorgroup -n $namespace -o name 2>$null
         if (-not $ogExists) {
             $operatorGroup = @"
 apiVersion: operators.coreos.com/v1
@@ -1458,7 +1466,7 @@ function Wait-ForPipelinesAsCodeRoute {
         try {
             # Intentar obtener la ruta primero en openshift-pipelines
             $routeOutput = oc --request-timeout=15s get route $routeName `
-                -n $Namespace -o jsonpath='{.spec.host}' 2>$null
+                -n $Namespace --ignore-not-found -o jsonpath='{.spec.host}' 2>$null
             if ($routeOutput -and $routeOutput -ne "null" -and $routeOutput -ne "") {
                 Write-Info "Ruta $routeName disponible en $Namespace (host: $routeOutput)"
                 return
@@ -1467,7 +1475,8 @@ function Wait-ForPipelinesAsCodeRoute {
             # Si no está en openshift-pipelines, intentar en pipelines-as-code
             if ($Namespace -eq "openshift-pipelines") {
                 $routeOutput = oc --request-timeout=15s get route $routeName `
-                    -n pipelines-as-code -o jsonpath='{.spec.host}' 2>$null
+                    -n pipelines-as-code --ignore-not-found `
+                    -o jsonpath='{.spec.host}' 2>$null
                 if ($routeOutput -and $routeOutput -ne "null" -and $routeOutput -ne "") {
                     Write-Info "Ruta $routeName disponible en pipelines-as-code (host: $routeOutput)"
                     return
@@ -1492,7 +1501,7 @@ function Wait-ForArgoCdRoute {
     $deadline = [DateTime]::UtcNow.AddSeconds($MaxWait)
     while ([DateTime]::UtcNow -lt $deadline) {
         $route = oc --request-timeout=15s get route argocd-server `
-            -n $Namespace -o name 2>$null
+            -n $Namespace --ignore-not-found -o name 2>$null
         if ($LASTEXITCODE -eq 0 -and $route) {
             Write-Info "La ruta argocd-server está disponible en $Namespace"
             return
@@ -1513,7 +1522,7 @@ function Wait-ForTaskRun {
     $deadline = [DateTime]::UtcNow.AddSeconds($MaxWait)
     while ([DateTime]::UtcNow -lt $deadline) {
         $taskRunJson = oc --request-timeout=15s get taskrun $Name `
-            -n $Namespace -o json 2>$null
+            -n $Namespace --ignore-not-found -o json 2>$null
         if ($LASTEXITCODE -eq 0 -and $taskRunJson) {
             $taskRun = $taskRunJson | ConvertFrom-Json
             $condition = $taskRun.status.conditions |
@@ -1546,7 +1555,6 @@ function Wait-ForGitRepository {
     while ([DateTime]::UtcNow -lt $deadline) {
         $curlArguments = @(
             "--silent",
-            "--show-error",
             "--fail",
             "--location",
             "--connect-timeout", "5",
@@ -1600,17 +1608,17 @@ function Command-Install {
     
     Write-Info "Creating namespaces $cicd_prj, $dev_prj, $stage_prj"
     
-    $ns = oc get ns $cicd_prj 2>$null
+    $ns = oc get ns $cicd_prj --ignore-not-found -o name 2>$null
     if (-not $ns) {
         oc new-project $cicd_prj | Out-Null
     }
     
-    $ns = oc get ns $dev_prj 2>$null
+    $ns = oc get ns $dev_prj --ignore-not-found -o name 2>$null
     if (-not $ns) {
         oc new-project $dev_prj | Out-Null
     }
     
-    $ns = oc get ns $stage_prj 2>$null
+    $ns = oc get ns $stage_prj --ignore-not-found -o name 2>$null
     if (-not $ns) {
         oc new-project $stage_prj | Out-Null
     }
@@ -1646,13 +1654,24 @@ function Command-Install {
     }
     
     # Crear o actualizar configmap de Gitea (idempotente)
-    $cmExists = oc get configmap gitea-config -n $cicd_prj 2>$null
-    if (-not $cmExists) {
-        $giteaConfig = Get-Content "config/gitea-configmap.yaml" -Raw
-        $giteaConfig = $giteaConfig -replace '@HOSTNAME', $giteaHostname
-        $giteaConfig | oc apply -f - -n $cicd_prj | Out-Null
+    $giteaConfig = Get-Content "config/gitea-configmap.yaml" -Raw
+    $giteaConfig = $giteaConfig -replace '@HOSTNAME', $giteaHostname
+    $giteaConfig | oc apply -f - -n $cicd_prj | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "No se pudo aplicar la configuración de Gitea"
     }
-    oc rollout status deployment/gitea -n $cicd_prj --timeout=5m 2>$null | Out-Null
+    oc rollout restart deployment/gitea -n $cicd_prj | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "No se pudo reiniciar Gitea con la configuración actualizada"
+    }
+    try {
+        oc rollout status deployment/gitea -n $cicd_prj --timeout=5m | Out-Null
+    } catch {
+        Write-Err "El deployment de Gitea no quedó disponible en 5 minutos"
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "El deployment de Gitea no quedó disponible en 5 minutos"
+    }
     
     # Crear taskrun siempre con oc create (tiene generateName, no se puede usar apply)
     Write-Info "Creando TaskRun para inicializar Gitea..."
@@ -1715,8 +1734,17 @@ function Command-Install {
             if ($LASTEXITCODE -ne 0) {
                 Write-Err "No se pudo crear el commit de Pipelines-as-Code"
             }
-            git remote remove auth-origin 2>$null | Out-Null
-            git remote add auth-origin "https://gitea:openshift@$giteaHostname/gitea/spring-petclinic" 2>$null | Out-Null
+            $remotes = @(git remote)
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "No se pudieron consultar los remotos Git"
+            }
+            if ($remotes -contains "auth-origin") {
+                git remote remove auth-origin | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Err "No se pudo eliminar el remoto temporal de Gitea"
+                }
+            }
+            git remote add auth-origin "https://gitea:openshift@$giteaHostname/gitea/spring-petclinic" | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Err "No se pudo configurar el remoto temporal de Gitea"
             }
@@ -1738,7 +1766,8 @@ function Command-Install {
     
     Write-Info "Configuring pipelines-as-code"
     # Verificar si el Repository ya existe
-    $repoExists = oc get repository spring-petclinic -n $cicd_prj 2>$null
+    $repoExists = oc get repository spring-petclinic -n $cicd_prj `
+        --ignore-not-found -o name 2>$null
     if ($repoExists) {
         Write-Info "El Repository pipelines-as-code ya está configurado"
     } else {
@@ -1860,7 +1889,8 @@ function Command-Start {
     }
     Assert-GitCommand
     $giteaHostname = oc --request-timeout=15s get route gitea `
-        -o template --template='{{.spec.host}}' -n $cicd_prj 2>$null
+        -o template --template='{{.spec.host}}' -n $cicd_prj `
+        --ignore-not-found 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $giteaHostname) {
         Write-Err "No se pudo obtener la ruta de Gitea en $cicd_prj"
     }

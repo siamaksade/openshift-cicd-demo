@@ -48,19 +48,19 @@ spec:
       containers:
         - name: postgresql
           imagePullPolicy: Always
-          image: postgres:12
+          image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:12
           env:
-            - name: POSTGRES_USER
+            - name: POSTGRESQL_USER
               value: gitea
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_PASSWORD
               value: gitea
-            - name: POSTGRES_DATABASE
+            - name: POSTGRESQL_DATABASE
               value: gitea
-            - name: POSTGRES_MAX_CONNECTIONS
+            - name: POSTGRESQL_MAX_CONNECTIONS
               value: "100"
-            - name: POSTGRES_SHARED_BUFFERS
+            - name: POSTGRESQL_SHARED_BUFFERS
               value: 12MB
-            - name: POSTGRES_ADMIN_PASSWORD
+            - name: POSTGRESQL_ADMIN_PASSWORD
               value: gitea
           ports:
             - containerPort: 5432
@@ -77,7 +77,7 @@ spec:
                 - /bin/sh
                 - -i
                 - -c
-                - psql -h 127.0.0.1 -U ${POSTGRES_USER} -q -d ${POSTGRES_DATABASE} -c 'SELECT 1'
+                - psql -h 127.0.0.1 -U ${POSTGRESQL_USER} -q -d ${POSTGRESQL_DATABASE} -c 'SELECT 1'
           resources:
             limits:
               memory: 512Mi
@@ -149,18 +149,33 @@ spec:
         app: gitea
         name: gitea
     spec:
+      initContainers:
+        - name: prepare-gitea-config
+          image: docker.io/gitea/gitea:1.23.8-rootless
+          command:
+            - /bin/sh
+            - -c
+            - cp /config-source/app.ini /config-runtime/app.ini
+          volumeMounts:
+            - mountPath: /config-source
+              name: gitea-config
+              readOnly: true
+            - mountPath: /config-runtime
+              name: gitea-runtime-config
       containers:
         - name: gitea
           imagePullPolicy: Always
-          image: docker.io/gitea/gitea:1.23.8
+          image: docker.io/gitea/gitea:1.23.8-rootless
           ports:
             - containerPort: 3000
               protocol: TCP
           volumeMounts:
             - mountPath: /gitea-repositories
               name: gitea-repositories
-            - mountPath: /home/gitea/conf
-              name: gitea-config
+            - mountPath: /var/lib/gitea
+              name: gitea-runtime-data
+            - mountPath: /etc/gitea
+              name: gitea-runtime-config
           readinessProbe:
             httpGet:
               path: /
@@ -184,6 +199,10 @@ spec:
         - name: gitea-repositories
           persistentVolumeClaim:
             claimName: gitea-repositories
+        - emptyDir: {}
+          name: gitea-runtime-data
+        - emptyDir: {}
+          name: gitea-runtime-config
         - configMap:
             items:
               - key: app.ini
