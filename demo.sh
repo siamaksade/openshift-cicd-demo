@@ -23,6 +23,7 @@ declare INGRESS_KEY_FILE_SHA256=""
 declare -r INGRESS_CONTROLLER="default"
 declare -r INGRESS_CERT_ANNOTATION="openshift-cicd-demo-certificate-chain-sha256"
 declare TLS_OPTIONS_EXPLICIT="false"
+declare CURL_SSL_NO_REVOKE="false"
 
 valid_command() {
   local fn=$1
@@ -1458,7 +1459,7 @@ wait_for_gitea_repository() {
     repository_available="false"
     case "$CA_MODE" in
     router)
-      if curl --connect-timeout 5 --max-time 15 --fail --silent \
+      if curl_for_gitea --connect-timeout 5 --max-time 15 --fail --silent \
         --show-error --location --insecure \
         "$repository_url/info/refs?service=git-upload-pack" \
         >/dev/null 2>&1; then
@@ -1466,7 +1467,7 @@ wait_for_gitea_repository() {
       fi
       ;;
     file)
-      if curl --connect-timeout 5 --max-time 15 --fail --silent \
+      if curl_for_gitea --connect-timeout 5 --max-time 15 --fail --silent \
         --show-error --location --cacert "$CA_FILE" \
         "$repository_url/info/refs?service=git-upload-pack" \
         >/dev/null 2>&1; then
@@ -1474,7 +1475,7 @@ wait_for_gitea_repository() {
       fi
       ;;
     none)
-      if curl --connect-timeout 5 --max-time 15 --fail --silent \
+      if curl_for_gitea --connect-timeout 5 --max-time 15 --fail --silent \
         --show-error --location \
         "$repository_url/info/refs?service=git-upload-pack" \
         >/dev/null 2>&1; then
@@ -1491,6 +1492,30 @@ wait_for_gitea_repository() {
   done
 
   err "Timeout esperando el repositorio de Gitea después de ${max_wait}s"
+}
+
+resolve_curl_options() {
+  local version_output=""
+
+  version_output=$(curl --version 2>/dev/null) ||
+    err "Could not determine the curl version"
+  CURL_SSL_NO_REVOKE="false"
+
+  case "$version_output" in
+  *[Ss][Cc][Hh][Aa][Nn][Nn][Ee][Ll]*)
+    curl --ssl-no-revoke --version >/dev/null 2>&1 ||
+      err "curl with Schannel must support --ssl-no-revoke; update curl"
+    CURL_SSL_NO_REVOKE="true"
+    ;;
+  esac
+}
+
+curl_for_gitea() {
+  if [[ "$CURL_SSL_NO_REVOKE" == "true" ]]; then
+    curl --ssl-no-revoke "$@"
+  else
+    curl "$@"
+  fi
 }
 
 configure_git_tls_environment() {
@@ -1531,6 +1556,7 @@ command.install() {
   oc version >/dev/null 2>&1 || err "no oc binary found"
   command -v git >/dev/null 2>&1 || err "git is required"
   command -v curl >/dev/null 2>&1 || err "curl is required"
+  resolve_curl_options
 
   preflight_ingress_tls
 

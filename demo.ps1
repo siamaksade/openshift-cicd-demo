@@ -23,6 +23,7 @@ $INGRESS_CERT_ANNOTATION = "openshift-cicd-demo-certificate-chain-sha256"
 $TLS_OPTIONS_EXPLICIT = $false
 $OPENSSL_COMMAND = ""
 $CURL_COMMAND = ""
+$CURL_SSL_NO_REVOKE = $false
 
 $dev_prj = "$PRJ_PREFIX-dev"
 $stage_prj = "$PRJ_PREFIX-stage"
@@ -173,6 +174,26 @@ function Resolve-CurlCommand {
     }
 
     $script:CURL_COMMAND = $command.Source
+    $versionOutput = (& $CURL_COMMAND --version 2>$null) -join "`n"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "No se pudo consultar la versión de curl"
+    }
+
+    $script:CURL_SSL_NO_REVOKE = $false
+    if ($versionOutput -match '(?i)\bSchannel\b') {
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $null = & $CURL_COMMAND --ssl-no-revoke --version 2>$null
+            $supportsNoRevoke = $LASTEXITCODE -eq 0
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        if (-not $supportsNoRevoke) {
+            Write-Err "curl con Schannel debe soportar --ssl-no-revoke; actualice curl"
+        }
+        $script:CURL_SSL_NO_REVOKE = $true
+    }
 }
 
 function Assert-GitCommand {
@@ -1560,6 +1581,9 @@ function Wait-ForGitRepository {
             "--connect-timeout", "5",
             "--max-time", "15"
         )
+        if ($CURL_SSL_NO_REVOKE) {
+            $curlArguments += "--ssl-no-revoke"
+        }
         switch ($CA_MODE) {
             "router" {
                 $curlArguments += "--insecure"

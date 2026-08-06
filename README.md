@@ -53,6 +53,12 @@ installer:
 | `file` | Uses the complete PEM CA bundle supplied through `--ca-file` or `-CaFile`. The default ConfigMap name is `<prefix>-trusted-ca`. | Validates the certificate chain against the supplied CA bundle. | Git uses `GIT_SSL_CAINFO` and the Gitea readiness probe uses `curl --cacert` with that file. |
 | `none` | Leaves `proxy/cluster.spec.trustedCA` unchanged. | When a custom certificate is supplied, validates its chain against `openshift-config-managed/trusted-ca-bundle`; the required CA must already be present in that managed cluster bundle. | Leaves inherited Git trust variables unchanged; `curl` uses its normal inherited/system trust configuration. |
 
+When the installer detects that curl uses the Windows Schannel backend, it adds
+`--ssl-no-revoke` only to the bounded Gitea readiness probe. This avoids
+`CRYPT_E_NO_REVOCATION_CHECK` in environments without a reachable revocation
+service, but disables certificate revocation checks for that probe. Certificate
+chain and hostname verification still follow the selected CA mode.
+
 On an implicit default `router` rerun, an already referenced `custom-ca` is not
 overwritten. The installer verifies that it contains the current router CA and
 that the managed bundle and cluster operators are stable. If it does not contain
